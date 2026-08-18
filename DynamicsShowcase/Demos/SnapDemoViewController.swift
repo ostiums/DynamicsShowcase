@@ -1,20 +1,20 @@
 import UIKit
 
-/// UISnapBehavior: плитки «прилипают» к точке касания с пружинной анимацией.
-/// Damping управляет колебательностью снапа.
+/// UISnapBehavior: tiles "snap" to the touch point with a spring animation.
+/// Damping controls how much the snap oscillates.
 final class SnapDemoViewController: DemoViewController {
 
     private var tiles: [BoxView] = []
     private var snaps: [UISnapBehavior] = []
 
-    private let dampingControl = UISegmentedControl(items: ["Упругий 0.2", "Средний 0.5", "Вязкий 0.9"])
+    private let dampingControl = UISegmentedControl(items: ["Bouncy 0.2", "Medium 0.5", "Stiff 0.9"])
     private var damping: CGFloat {
         [0.2, 0.5, 0.9][dampingControl.selectedSegmentIndex]
     }
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        showHint("Тапни в любое место — плитки прилетят туда.  UISnapBehavior(damping:)")
+        showHint("Tap anywhere — the tiles fly there.  UISnapBehavior(damping:)")
 
         dampingControl.selectedSegmentIndex = 0
         dampingControl.selectedSegmentTintColor = Palette.magenta.withAlphaComponent(0.6)
@@ -53,11 +53,11 @@ final class SnapDemoViewController: DemoViewController {
         let point = tap.location(in: contentView)
         Haptics.action()
 
-        // Прошлые снапы убираем — у элемента может быть только один активный snap.
+        // Remove previous snaps — an item can have only one active snap.
         snaps.forEach { animator.removeBehavior($0) }
         snaps.removeAll()
 
-        // Плитки разлетаются по окружности вокруг пальца; каждый тап — новый угол.
+        // Tiles spread on a circle around the finger; every tap picks a new rotation.
         let radius: CGFloat = 74
         let baseAngle = CGFloat.random(in: 0 ..< .pi * 2)
         for (i, tile) in tiles.enumerated() {

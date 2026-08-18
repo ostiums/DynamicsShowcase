@@ -1,11 +1,11 @@
 import UIKit
 
-/// UIDynamicItemBehavior: как физические свойства меняют поведение тел.
-/// «Упругость» — одинаковые шары с разным elasticity падают одновременно.
-/// «Плотность» — одинаковый импульс двигает тела с разной density по-разному.
+/// UIDynamicItemBehavior: how physical properties change the way bodies move.
+/// "Elasticity" — identical balls with different elasticity dropped at once.
+/// "Density" — the same impulse moves bodies of different density differently.
 final class PropertiesDemoViewController: DemoViewController {
 
-    private let modeControl = UISegmentedControl(items: ["Упругость", "Плотность"])
+    private let modeControl = UISegmentedControl(items: ["Elasticity", "Density"])
     private var labels: [UILabel] = []
 
     override func viewDidLoad() {
@@ -33,6 +33,7 @@ final class PropertiesDemoViewController: DemoViewController {
         Haptics.action()
         animator.removeAllBehaviors()
         contentView.subviews.forEach { $0.removeFromSuperview() }
+        contentView.layer.sublayers?.forEach { $0.removeFromSuperlayer() }
         labels.removeAll()
         buildScene()
     }
@@ -48,7 +49,7 @@ final class PropertiesDemoViewController: DemoViewController {
     // MARK: - Elasticity
 
     private func buildElasticityScene() {
-        showHint("elasticity 0.1 → 0.95 — одинаковые шары, разная упругость.  Тап — повтор")
+        showHint("elasticity 0.1 → 0.95 — same balls, different bounciness.  Tap to replay")
 
         let values: [CGFloat] = [0.1, 0.4, 0.7, 0.95]
         let colors = [Palette.coral, Palette.amber, Palette.mint, Palette.cyan]
@@ -60,7 +61,7 @@ final class PropertiesDemoViewController: DemoViewController {
         animator.addBehavior(gravity)
         animator.addBehavior(collision)
 
-        // Видимый «пол» выше подписей и подсказки.
+        // A visible "floor" above the captions and the hint.
         let floorY = view.bounds.height - 180
         collision.addBoundary(withIdentifier: "floor" as NSString,
                               from: CGPoint(x: 0, y: floorY),
@@ -82,7 +83,7 @@ final class PropertiesDemoViewController: DemoViewController {
             ball.center = CGPoint(x: x, y: view.safeAreaInsets.top + 130)
             contentView.addSubview(ball)
 
-            // У каждого шара своё поведение — в этом и суть демо.
+            // Each ball gets its own behavior — that's the whole point of the demo.
             let props = UIDynamicItemBehavior(items: [ball])
             props.elasticity = elasticity
             animator.addBehavior(props)
@@ -98,7 +99,7 @@ final class PropertiesDemoViewController: DemoViewController {
     // MARK: - Density
 
     private func buildDensityScene() {
-        showHint("density 0.3 → 2.4 — одинаковый импульс, разная масса.  Тап — повтор")
+        showHint("density 0.3 → 2.4 — same impulse, different mass.  Tap to replay")
 
         let values: [CGFloat] = [0.3, 0.8, 1.5, 2.4]
         let colors = [Palette.cyan, Palette.mint, Palette.amber, Palette.coral]
@@ -128,7 +129,7 @@ final class PropertiesDemoViewController: DemoViewController {
             animator.addBehavior(props)
             collision.addItem(ball)
 
-            // Всем один и тот же импульс.
+            // The exact same impulse for everyone.
             let push = UIPushBehavior(items: [ball], mode: .instantaneous)
             push.pushDirection = CGVector(dx: 1.6, dy: 0)
             animator.addBehavior(push)

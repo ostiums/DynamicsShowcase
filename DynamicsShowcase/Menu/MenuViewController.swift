@@ -12,32 +12,32 @@ final class MenuViewController: UIViewController, UITableViewDataSource, UITable
 
     private let items: [Item] = [
         Item(emoji: "🌍", color: Palette.cyan,
-             title: "Гравитация",
+             title: "Gravity",
              subtitle: "UIGravityBehavior · UICollisionBehavior",
              make: { GravityDemoViewController() }),
         Item(emoji: "🧲", color: Palette.magenta,
-             title: "Притяжение — Snap",
+             title: "Snap",
              subtitle: "UISnapBehavior",
              make: { SnapDemoViewController() }),
         Item(emoji: "⛓️", color: Palette.violet,
-             title: "Цепи и маятники",
+             title: "Wrecking Ball",
              subtitle: "UIAttachmentBehavior",
              make: { AttachmentDemoViewController() }),
         Item(emoji: "🚀", color: Palette.mint,
-             title: "Импульсы — Push",
+             title: "Push Impulses",
              subtitle: "UIPushBehavior",
              make: { PushDemoViewController() }),
         Item(emoji: "🌀", color: Palette.amber,
-             title: "Силовые поля",
-             subtitle: "UIFieldBehavior — 10 типов полей",
+             title: "Force Fields",
+             subtitle: "UIFieldBehavior — 10 field types",
              make: { FieldsDemoViewController() }),
         Item(emoji: "⚖️", color: Palette.coral,
-             title: "Свойства тел",
+             title: "Body Properties",
              subtitle: "UIDynamicItemBehavior",
              make: { PropertiesDemoViewController() }),
         Item(emoji: "🎪", color: Palette.cyan,
-             title: "Плейграунд",
-             subtitle: "Всё вместе + UIDynamicItemGroup",
+             title: "Playground",
+             subtitle: "Everything + UIDynamicItemGroup",
              make: { PlaygroundDemoViewController() }),
     ]
 
@@ -61,7 +61,7 @@ final class MenuViewController: UIViewController, UITableViewDataSource, UITable
         tableView.contentInset = UIEdgeInsets(top: 8, left: 0, bottom: 24, right: 0)
 
         let header = UILabel(frame: CGRect(x: 0, y: 0, width: view.bounds.width, height: 44))
-        header.text = "Физический движок прямо в UIKit.\nНастоящая физика — без SpriteKit."
+        header.text = "A physics engine built right into UIKit.\nReal physics — no SpriteKit needed."
         header.numberOfLines = 2
         header.textAlignment = .center
         header.font = UIFont.systemFont(ofSize: 14, weight: .medium).rounded()
@@ -82,7 +82,7 @@ final class MenuViewController: UIViewController, UITableViewDataSource, UITable
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        // AUTO_OPEN_DEMO=<0...6> сразу открывает нужный экран (удобно для записи и тестов).
+        // AUTO_OPEN_DEMO=<0...6> jumps straight to a demo (handy for recording and tests).
         if !didAutoOpen,
            let value = ProcessInfo.processInfo.environment["AUTO_OPEN_DEMO"],
            let index = Int(value), items.indices.contains(index) {

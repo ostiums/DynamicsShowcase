@@ -1,13 +1,13 @@
 import UIKit
 
-/// Финальный плейграунд: всё вместе.
-/// Гравитация, наклонные рампы-границы, шары по тапу, спарки-«домино» (UIDynamicItemGroup)
-/// по долгому нажатию, перетаскивание любого предмета, магнит по тапу двумя пальцами.
+/// The grand finale: everything at once.
+/// Gravity, slanted ramp boundaries, balls on tap, domino pairs (UIDynamicItemGroup)
+/// on long-press, dragging any item, and a two-finger-tap magnet.
 final class PlaygroundDemoViewController: DemoViewController, UICollisionBehaviorDelegate {
 
-    private let gravity = UIGravityBehavior()
-    private let collision = UICollisionBehavior()
-    private let properties = UIDynamicItemBehavior()
+    private var gravity = UIGravityBehavior()
+    private var collision = UICollisionBehavior()
+    private var properties = UIDynamicItemBehavior()
 
     private var items: [UIView] = []
     private var groups: [UIDynamicItemGroup] = []
@@ -17,7 +17,7 @@ final class PlaygroundDemoViewController: DemoViewController, UICollisionBehavio
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        showHint("Тап — шар · долгий тап — домино-группа · тяни и бросай · два пальца — магнит")
+        showHint("Tap — ball · long-press — domino group · drag & throw · two-finger tap — magnet")
 
         view.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(handleTap)))
         view.addGestureRecognizer(UILongPressGestureRecognizer(target: self, action: #selector(handleLongPress)))
@@ -32,6 +32,10 @@ final class PlaygroundDemoViewController: DemoViewController, UICollisionBehavio
         items.removeAll()
         groups.removeAll()
         magnetSnaps.removeAll()
+
+        gravity = UIGravityBehavior()
+        collision = UICollisionBehavior()
+        properties = UIDynamicItemBehavior()
 
         collision.translatesReferenceBoundsIntoBoundary = true
         collision.collisionDelegate = self
@@ -54,7 +58,7 @@ final class PlaygroundDemoViewController: DemoViewController, UICollisionBehavio
         }
     }
 
-    /// Наклонные рампы: линии-границы коллизий, нарисованные светящимися слоями.
+    /// Slanted ramps: collision boundary lines drawn as glowing layers.
     private func addRamps() {
         let w = view.bounds.width
         let h = view.bounds.height
@@ -82,7 +86,7 @@ final class PlaygroundDemoViewController: DemoViewController, UICollisionBehavio
         }
     }
 
-    // MARK: - Создание объектов
+    // MARK: - Spawning
 
     private func spawnBall(at point: CGPoint) {
         let ball = BallView(diameter: .random(in: 32...58), color: Palette.randomNeon())
@@ -96,7 +100,7 @@ final class PlaygroundDemoViewController: DemoViewController, UICollisionBehavio
         trimItems()
     }
 
-    /// UIDynamicItemGroup: два квадрата движутся как одно жёсткое тело.
+    /// UIDynamicItemGroup: two squares move as a single rigid body.
     private func spawnGroup(at point: CGPoint) {
         let size: CGFloat = 34
         let color = Palette.randomNeon()
@@ -119,7 +123,7 @@ final class PlaygroundDemoViewController: DemoViewController, UICollisionBehavio
     private func trimItems() {
         guard items.count > 34 else { return }
         let old = items.removeFirst()
-        guard !(old is BoxView) else { return } // группы не разбираем, убираем только шары
+        guard !(old is BoxView) else { return } // don't break up groups, only drop balls
         gravity.removeItem(old)
         collision.removeItem(old)
         properties.removeItem(old)
@@ -128,7 +132,7 @@ final class PlaygroundDemoViewController: DemoViewController, UICollisionBehavio
         }
     }
 
-    // MARK: - Жесты
+    // MARK: - Gestures
 
     @objc private func handleTap(_ tap: UITapGestureRecognizer) {
         spawnBall(at: tap.location(in: contentView))
@@ -146,7 +150,7 @@ final class PlaygroundDemoViewController: DemoViewController, UICollisionBehavio
 
         switch pan.state {
         case .began:
-            // Участников групп не таскаем поодиночке — ими управляет UIDynamicItemGroup.
+            // Group members can't be dragged individually — UIDynamicItemGroup owns them.
             guard let target = items
                 .filter({ !($0 is BoxView) })
                 .map({ ($0, hypot($0.center.x - location.x, $0.center.y - location.y)) })
@@ -167,7 +171,7 @@ final class PlaygroundDemoViewController: DemoViewController, UICollisionBehavio
                 animator.removeBehavior(dragAttachment)
                 self.dragAttachment = nil
             }
-            // Бросок: скорость жеста передаём предмету.
+            // Throw: hand the gesture velocity over to the item.
             if let draggedView {
                 let velocity = pan.velocity(in: contentView)
                 properties.addLinearVelocity(
@@ -179,7 +183,7 @@ final class PlaygroundDemoViewController: DemoViewController, UICollisionBehavio
         }
     }
 
-    /// Магнит: все предметы слетаются к точке касания, через секунду снова падают.
+    /// Magnet: every item flies to the touch point, then falls again a second later.
     @objc private func handleMagnet(_ tap: UITapGestureRecognizer) {
         let point = tap.location(in: contentView)
         Haptics.action()

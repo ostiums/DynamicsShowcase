@@ -22,7 +22,7 @@ enum Haptics {
     private static let rigid = UIImpactFeedbackGenerator(style: .rigid)
     private static var lastFire: CFTimeInterval = 0
 
-    /// Столкновения происходят десятками в секунду — троттлим, чтобы Taptic Engine не захлёбывался.
+    /// Collisions fire dozens of times per second — throttle so the Taptic Engine keeps up.
     static func collision(intensity: CGFloat = 0.6) {
         let now = CACurrentMediaTime()
         guard now - lastFire > 0.06 else { return }
@@ -53,7 +53,7 @@ extension UIColor {
     }
 }
 
-/// Тёмный градиентный фон всех экранов.
+/// Dark gradient background shared by every screen.
 final class GradientBackgroundView: UIView {
     override class var layerClass: AnyClass { CAGradientLayer.self }
 
@@ -68,7 +68,7 @@ final class GradientBackgroundView: UIView {
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 }
 
-/// Подсказка внизу экрана.
+/// Bottom-of-screen hint pill.
 final class HintLabel: UILabel {
     private let insets = UIEdgeInsets(top: 10, left: 16, bottom: 10, right: 16)
 

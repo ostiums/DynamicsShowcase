@@ -1,10 +1,10 @@
 import UIKit
 
-/// База всех демо: градиентный фон, contentView для физических объектов,
-/// UIDynamicAnimator, подсказка внизу и кнопка перезапуска.
+/// Base class for every demo: gradient background, a contentView hosting the physics
+/// items, a UIDynamicAnimator, a bottom hint and a reset button.
 class DemoViewController: UIViewController {
 
-    /// Слой, в котором живут физические объекты. Он же — referenceView аниматора.
+    /// Layer that hosts the dynamic items. Also the animator's reference view.
     let contentView = UIView()
 
     lazy var animator = UIDynamicAnimator(referenceView: contentView)
@@ -45,9 +45,9 @@ class DemoViewController: UIViewController {
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        // Без preferredMaxLayoutWidth многострочная подсказка может сжаться в точку.
+        // Without preferredMaxLayoutWidth a multiline hint can collapse to a dot.
         hintLabel.preferredMaxLayoutWidth = view.bounds.width - 96
-        // Сцену строим, когда известны реальные размеры экрана.
+        // Build the scene once the real screen size is known.
         if !didBuildScene, view.bounds.width > 0 {
             didBuildScene = true
             buildScene()
@@ -67,6 +67,8 @@ class DemoViewController: UIViewController {
         view.setNeedsLayout()
     }
 
-    /// Точка входа демо. Вызывается после layout и при каждом сбросе.
+    /// Demo entry point. Called after layout and on every reset.
+    /// Behaviors must be created fresh here: reused behavior instances would still
+    /// reference items removed by a previous reset.
     func buildScene() { }
 }

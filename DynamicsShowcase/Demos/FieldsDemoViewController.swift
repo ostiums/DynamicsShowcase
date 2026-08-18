@@ -1,7 +1,7 @@
 import UIKit
 
-/// UIFieldBehavior: все 10 типов силовых полей на рое из 60 частиц.
-/// Поле следует за пальцем; тип выбирается чипами сверху.
+/// UIFieldBehavior: all 10 field types acting on a swarm of 60 particles.
+/// The field follows the finger; the type is picked with the chips on top.
 final class FieldsDemoViewController: DemoViewController {
 
     private enum FieldKind: String, CaseIterable {
@@ -18,25 +18,24 @@ final class FieldsDemoViewController: DemoViewController {
 
         var hint: String {
             switch self {
-            case .radial: return ".radialGravityField — частицы стягиваются к пальцу"
-            case .spring: return ".springField — пружина к центру поля, рой пульсирует"
-            case .vortex: return ".vortexField — закручивает частицы вокруг пальца"
-            case .noise: return ".noiseField — случайная сила, броуновское движение"
-            case .turbulence: return ".turbulenceField — турбулентность, сила зависит от скорости"
-            case .velocity: return ".velocityField — струя вверх + гравитация = фонтан"
-            case .linear: return ".linearGravityField — линейная гравитация в области поля"
-            case .drag: return ".dragField — зона вязкости: внутри круга частицы вязнут"
-            case .electric: return ".electricField — заряженные частицы (charge) притягиваются"
-            case .magnetic: return ".magneticField — сила ⊥ скорости, траектории закручиваются"
+            case .radial: return ".radialGravityField — particles are pulled toward the finger"
+            case .spring: return ".springField — a spring toward the field center, the swarm pulses"
+            case .vortex: return ".vortexField — swirls particles around the finger"
+            case .noise: return ".noiseField — random force, Brownian motion"
+            case .turbulence: return ".turbulenceField — turbulence, force depends on velocity"
+            case .velocity: return ".velocityField — an upward jet + gravity = fountain"
+            case .linear: return ".linearGravityField — linear gravity across the field region"
+            case .drag: return ".dragField — a viscosity zone: particles get stuck inside the circle"
+            case .electric: return ".electricField — charged particles (charge) are attracted"
+            case .magnetic: return ".magneticField — force ⊥ velocity, trajectories curl"
             }
         }
     }
 
     private var particles: [BallView] = []
-    private let properties = UIDynamicItemBehavior()
-    private let collision = UICollisionBehavior()
+    private var properties = UIDynamicItemBehavior()
+    private var collision = UICollisionBehavior()
     private var activeFields: [UIFieldBehavior] = []
-    private var extraBehaviors: [UIDynamicBehavior] = []
 
     private var fieldCenter: CGPoint = .zero
     private let ringLayer = CAShapeLayer()
@@ -85,19 +84,16 @@ final class FieldsDemoViewController: DemoViewController {
             stack.heightAnchor.constraint(equalTo: chipScroll.frameLayoutGuide.heightAnchor, constant: -8),
         ])
 
-        let pan = UIPanGestureRecognizer(target: self, action: #selector(handleDrag))
-        view.addGestureRecognizer(pan)
-        let tap = UITapGestureRecognizer(target: self, action: #selector(handleDrag))
-        view.addGestureRecognizer(tap)
+        view.addGestureRecognizer(UIPanGestureRecognizer(target: self, action: #selector(handleDrag)))
+        view.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(handleDrag)))
     }
 
     override func buildScene() {
         particles.removeAll()
         activeFields.removeAll()
-        extraBehaviors.removeAll()
         fieldCenter = CGPoint(x: view.bounds.midX, y: view.bounds.midY + 40)
 
-        // Кольцо показывает позицию поля.
+        // The ring marks the field position.
         ringLayer.strokeColor = UIColor.white.withAlphaComponent(0.4).cgColor
         ringLayer.fillColor = nil
         ringLayer.lineWidth = 1.5
@@ -114,13 +110,16 @@ final class FieldsDemoViewController: DemoViewController {
         pulse.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
         ringLayer.add(pulse, forKey: "pulse")
 
+        properties = UIDynamicItemBehavior()
         properties.density = 0.4
         properties.resistance = 0.8
         properties.allowsRotation = false
-        properties.charge = 1.0 // нужно для electric и magnetic полей
+        properties.charge = 1.0 // needed by the electric and magnetic fields
 
+        collision = UICollisionBehavior()
         collision.translatesReferenceBoundsIntoBoundary = true
-        collision.collisionMode = .boundaries // частицы не сталкиваются между собой
+        // Particles collide with each other too, so attracting fields form a
+        // pretty round cluster instead of collapsing into a single point.
 
         animator.addBehavior(properties)
         animator.addBehavior(collision)
@@ -138,7 +137,7 @@ final class FieldsDemoViewController: DemoViewController {
         apply(kind: currentKind)
     }
 
-    // MARK: - Настройка полей
+    // MARK: - Field setup
 
     @objc private func chipTapped(_ button: UIButton) {
         Haptics.action()
@@ -152,9 +151,7 @@ final class FieldsDemoViewController: DemoViewController {
         highlightChip()
 
         activeFields.forEach { animator.removeBehavior($0) }
-        extraBehaviors.forEach { animator.removeBehavior($0) }
         activeFields.removeAll()
-        extraBehaviors.removeAll()
 
         switch kind {
         case .radial:
@@ -175,7 +172,7 @@ final class FieldsDemoViewController: DemoViewController {
             vortex.position = fieldCenter
             vortex.strength = 0.006
             addField(vortex)
-            // Слабое радиальное притяжение удерживает воронку от разлёта.
+            // A weak radial pull keeps the funnel from flying apart.
             let hold = UIFieldBehavior.radialGravityField(position: fieldCenter)
             hold.strength = 5
             hold.falloff = 1
@@ -213,7 +210,7 @@ final class FieldsDemoViewController: DemoViewController {
             drag.region = UIRegion(radius: 130)
             drag.strength = 8
             addField(drag)
-            // Шум снаружи разгоняет частицы, зона drag их «засасывает» в желе.
+            // Noise outside stirs the particles; the drag zone traps them like jelly.
             let stir = UIFieldBehavior.noiseField(smoothness: 0.9, animationSpeed: 1)
             stir.strength = 0.5
             addField(stir)
@@ -221,7 +218,7 @@ final class FieldsDemoViewController: DemoViewController {
         case .electric:
             let field = UIFieldBehavior.electricField()
             field.position = fieldCenter
-            field.strength = -6 // отрицательная сила притягивает положительный заряд
+            field.strength = -6 // negative strength attracts a positive charge
             field.falloff = 1
             field.minimumRadius = 50
             addField(field)
@@ -236,6 +233,10 @@ final class FieldsDemoViewController: DemoViewController {
     }
 
     private func addField(_ field: UIFieldBehavior) {
+        // A field only affects items explicitly added to it.
+        for particle in particles {
+            field.addItem(particle)
+        }
         animator.addBehavior(field)
         activeFields.append(field)
     }
@@ -260,7 +261,7 @@ final class FieldsDemoViewController: DemoViewController {
         }
     }
 
-    // MARK: - Перемещение поля
+    // MARK: - Moving the field
 
     @objc private func handleDrag(_ gesture: UIGestureRecognizer) {
         let location = gesture.location(in: contentView)
@@ -272,7 +273,7 @@ final class FieldsDemoViewController: DemoViewController {
         ringLayer.position = fieldCenter
         CATransaction.commit()
 
-        // Поля с точкой (position) переносим за пальцем; глобальные (noise, linear) не трогаем.
+        // Point-based fields follow the finger; infinite ones (noise, linear) don't care.
         for field in activeFields {
             field.position = fieldCenter
         }

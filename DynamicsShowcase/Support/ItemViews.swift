@@ -1,6 +1,6 @@
 import UIKit
 
-/// Неоновый шар со свечением. Физическая граница — эллипс (collisionBoundsType).
+/// Glowing neon ball. Its physics boundary is an ellipse (collisionBoundsType).
 final class BallView: UIView {
     let color: UIColor
 
@@ -34,7 +34,7 @@ final class BallView: UIView {
 
     override var collisionBoundsType: UIDynamicItemCollisionBoundsType { .ellipse }
 
-    /// Вспышка свечения при столкновении.
+    /// Glow pulse on collision.
     func flash() {
         let pulse = CABasicAnimation(keyPath: "shadowOpacity")
         pulse.fromValue = 1.0
@@ -45,7 +45,7 @@ final class BallView: UIView {
     }
 }
 
-/// Плитка со скруглением и (опционально) буквой.
+/// Rounded tile with an optional letter.
 final class BoxView: UIView {
     let color: UIColor
 

@@ -1,12 +1,12 @@
 import UIKit
 
 /// UIGravityBehavior + UICollisionBehavior.
-/// Тап — бросить шар. Пан — изменить направление гравитации (стрелка показывает вектор).
+/// Tap to drop a ball. Drag to steer the gravity vector (the arrow shows it).
 final class GravityDemoViewController: DemoViewController, UICollisionBehaviorDelegate {
 
-    private let gravity = UIGravityBehavior()
-    private let collision = UICollisionBehavior()
-    private let bounce = UIDynamicItemBehavior()
+    private var gravity = UIGravityBehavior()
+    private var collision = UICollisionBehavior()
+    private var bounce = UIDynamicItemBehavior()
     private var balls: [BallView] = []
 
     private let arrow = UIImageView(image: UIImage(
@@ -16,7 +16,7 @@ final class GravityDemoViewController: DemoViewController, UICollisionBehaviorDe
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        showHint("Тапай — шары падают.  Веди пальцем — меняешь направление гравитации")
+        showHint("Tap to drop balls.  Drag to steer the gravity vector")
 
         arrow.tintColor = UIColor.white.withAlphaComponent(0.35)
         arrow.translatesAutoresizingMaskIntoConstraints = false
@@ -34,6 +34,10 @@ final class GravityDemoViewController: DemoViewController, UICollisionBehaviorDe
     override func buildScene() {
         balls.removeAll()
 
+        gravity = UIGravityBehavior()
+        collision = UICollisionBehavior()
+        bounce = UIDynamicItemBehavior()
+
         collision.translatesReferenceBoundsIntoBoundary = true
         collision.collisionDelegate = self
 
@@ -46,14 +50,14 @@ final class GravityDemoViewController: DemoViewController, UICollisionBehaviorDe
         animator.addBehavior(collision)
         animator.addBehavior(bounce)
 
-        gravity.gravityDirection = CGVector(dx: 0, dy: 1)
         setArrow(direction: CGVector(dx: 0, dy: 1))
 
-        // Стартовый «дождь» из шаров — красиво для записи с первой секунды.
+        // Opening rain of balls — looks great from the first second of a recording.
         for i in 0..<10 {
             DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.09) { [weak self] in
                 guard let self else { return }
-                // Спавним внутри границ: снаружи шар упёрся бы в верхнюю стенку коллизий.
+                // Spawn inside the bounds: outside, a ball would rest on top of the
+                // collision boundary created by translatesReferenceBoundsIntoBoundary.
                 let x = CGFloat.random(in: 40...(self.view.bounds.width - 40))
                 self.spawnBall(at: CGPoint(x: x, y: CGFloat.random(in: 130...300)))
             }
@@ -73,7 +77,7 @@ final class GravityDemoViewController: DemoViewController, UICollisionBehaviorDe
         ball.transform = CGAffineTransform(scaleX: 0.01, y: 0.01)
         UIView.animate(withDuration: 0.2) { ball.transform = .identity }
 
-        // Держим сцену лёгкой: старые шары убираем.
+        // Keep the scene light: drop the oldest balls.
         if balls.count > 26 {
             let old = balls.removeFirst()
             gravity.removeItem(old)
@@ -102,7 +106,7 @@ final class GravityDemoViewController: DemoViewController, UICollisionBehaviorDe
     }
 
     private func setArrow(direction: CGVector) {
-        // Стрелка исходно смотрит вверх (0, -1); поворачиваем её вдоль вектора гравитации.
+        // The arrow points up by default (0, -1); rotate it along the gravity vector.
         arrow.transform = CGAffineTransform(rotationAngle: atan2(direction.dx, -direction.dy))
     }
 

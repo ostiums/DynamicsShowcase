@@ -1,15 +1,15 @@
 import UIKit
 
-/// UIPushBehavior: аэрохоккей.
-/// Флик — мгновенный импульс (.instantaneous) с закруткой через точку приложения силы.
-/// Режим «Тяга» — постоянная сила (.continuous) с вращающимся вектором.
+/// UIPushBehavior: air hockey.
+/// Flick — an instantaneous impulse (.instantaneous) with spin via the force
+/// application point. "Continuous" mode — a constant force with a rotating vector.
 final class PushDemoViewController: DemoViewController, UICollisionBehaviorDelegate {
 
     private var pucks: [BallView] = []
-    private let collision = UICollisionBehavior()
-    private let properties = UIDynamicItemBehavior()
+    private var collision = UICollisionBehavior()
+    private var properties = UIDynamicItemBehavior()
 
-    private let modeControl = UISegmentedControl(items: ["Импульс", "Постоянная тяга"])
+    private let modeControl = UISegmentedControl(items: ["Impulse", "Continuous force"])
     private var continuousPush: UIPushBehavior?
     private var rotationLink: CADisplayLink?
 
@@ -19,7 +19,7 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        showHint("Сделай флик от шайбы — мгновенный импульс.  Сила = скорость жеста")
+        showHint("Flick a puck — an instantaneous impulse.  Force = gesture velocity")
 
         modeControl.selectedSegmentIndex = 0
         modeControl.selectedSegmentTintColor = Palette.mint.withAlphaComponent(0.5)
@@ -51,6 +51,9 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
         rotationLink?.invalidate()
         rotationLink = nil
 
+        collision = UICollisionBehavior()
+        properties = UIDynamicItemBehavior()
+
         collision.translatesReferenceBoundsIntoBoundary = true
         collision.collisionDelegate = self
 
@@ -80,7 +83,7 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
         }
     }
 
-    // MARK: - Флик (instantaneous)
+    // MARK: - Flick (instantaneous)
 
     @objc private func handlePan(_ pan: UIPanGestureRecognizer) {
         guard modeControl.selectedSegmentIndex == 0 else { return }
@@ -111,12 +114,12 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
             let push = UIPushBehavior(items: [puck], mode: .instantaneous)
             push.pushDirection = CGVector(dx: velocity.x / 700, dy: velocity.y / 700)
 
-            // Смещение точки приложения силы от центра даёт закрутку шайбы.
+            // Applying the force off-center makes the puck spin.
             let offset = UIOffset(horizontal: (flickStart.x - puck.center.x).clamped(to: -20...20),
                                   vertical: (flickStart.y - puck.center.y).clamped(to: -20...20))
             push.setTargetOffsetFromCenter(offset, for: puck)
 
-            // Мгновенный импульс отрабатывает один раз — после этого поведение убираем.
+            // An instantaneous push fires once — remove the behavior afterwards.
             push.action = { [weak self, weak push] in
                 if let push, !push.active {
                     self?.animator.removeBehavior(push)
@@ -130,14 +133,14 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
         }
     }
 
-    // MARK: - Постоянная тяга (continuous)
+    // MARK: - Continuous force
 
     @objc private func modeChanged() {
         if modeControl.selectedSegmentIndex == 1 {
-            showHint("UIPushBehavior(.continuous) — постоянная сила, вектор медленно вращается")
+            showHint("UIPushBehavior(.continuous) — constant force with a slowly rotating vector")
             startContinuousPush()
         } else {
-            showHint("Сделай флик от шайбы — мгновенный импульс.  Сила = скорость жеста")
+            showHint("Flick a puck — an instantaneous impulse.  Force = gesture velocity")
             stopContinuousPush()
         }
     }
