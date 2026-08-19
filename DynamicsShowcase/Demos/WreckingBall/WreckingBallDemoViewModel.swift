@@ -1,8 +1,8 @@
 import UIKit
 
-/// Pure geometry of the wrecking-ball scene: chain layout, tower placement
-/// and the launch kick. All the tricky math lives here, fully testable and
-/// free of any UIKit Dynamics code.
+/// Pure geometry of the wrecking-ball scene: chain layout and tower placement.
+/// All the tricky math lives here, fully testable and free of any
+/// UIKit Dynamics code.
 struct WreckingBallDemoViewModel {
 
     let hint = "Drag the ball and smash the tower.  Anchor + item-to-item rigid links"
@@ -36,7 +36,6 @@ struct WreckingBallDemoViewModel {
     let chainAngularResistance: CGFloat = 0.2
     /// The wrecking ball is much denser than the chain — that's what carries the momentum.
     let wreckingBallDensity: CGFloat = 2.5
-    let launchSpeed: CGFloat = 260
 
     // Tower tuning.
     let blockSize: CGFloat = 30
@@ -64,10 +63,9 @@ struct WreckingBallDemoViewModel {
         }
     }
 
-    /// Lays the chain out along a straight line tilted from vertical.
-    /// The tilt makes the pendulum start swinging by itself; the angle is
-    /// capped so the last ball always stays inside the screen.
-    func chainLayout(anchor: CGPoint, in bounds: CGRect) -> ChainLayout {
+    /// Lays the chain out hanging straight down from the anchor, at rest.
+    /// The player swings it into the tower by dragging the wrecking ball.
+    func chainLayout(anchor: CGPoint) -> ChainLayout {
         var distances: [CGFloat] = []
         var reach = firstLinkLength
         for (index, ball) in chainBalls.enumerated() {
@@ -76,21 +74,7 @@ struct WreckingBallDemoViewModel {
             }
             distances.append(reach)
         }
-
-        let length = distances.last ?? 1
-        let maxDx = bounds.width - anchor.x - wreckingBallDiameter / 2 - 12
-        let sine = min(0.85, maxDx / length)
-        let direction = CGVector(dx: sine, dy: sqrt(1 - sine * sine))
-
-        return ChainLayout(distances: distances, direction: direction)
-    }
-
-    /// Initial velocity of the wrecking ball, tangential to the swing arc
-    /// (perpendicular to the chain, pointing "downhill"). Guarantees a
-    /// spectacular first hit even with air resistance.
-    func launchVelocity(chainDirection: CGVector) -> CGPoint {
-        CGPoint(x: -chainDirection.dy * launchSpeed,
-                y: chainDirection.dx * launchSpeed)
+        return ChainLayout(distances: distances, direction: CGVector(dx: 0, dy: 1))
     }
 
     // MARK: - Tower
@@ -108,9 +92,9 @@ struct WreckingBallDemoViewModel {
     /// `clearance` below it — close enough for the ball to plow through the
     /// blocks, far enough that the platform itself never blocks the swing.
     /// The platform also must not extend toward the arc's lowest point,
-    /// which is why it ends shortly after the tower.
+    /// which is why it ends shortly before the tower on the center side.
     func towerLayout(anchor: CGPoint, chainLength: CGFloat, in bounds: CGRect) -> TowerLayout {
-        let towerX: CGFloat = 90
+        let towerX = bounds.width - 90
         let clearance = wreckingBallDiameter / 2 + 16
 
         let dx = towerX - anchor.x
@@ -129,8 +113,8 @@ struct WreckingBallDemoViewModel {
         }
 
         return TowerLayout(
-            platformStart: CGPoint(x: towerX - 70, y: platformY),
-            platformEnd: CGPoint(x: towerX + 40, y: platformY),
+            platformStart: CGPoint(x: towerX - 40, y: platformY),
+            platformEnd: CGPoint(x: towerX + 70, y: platformY),
             blockCenters: centers
         )
     }

@@ -84,7 +84,7 @@ final class WreckingBallDemoViewController: DemoViewController, UICollisionBehav
 
         addAnchorDot()
 
-        let layout = viewModel.chainLayout(anchor: anchorPoint, in: view.bounds)
+        let layout = viewModel.chainLayout(anchor: anchorPoint)
         buildTower(chainLength: layout.length)
         buildChain(with: layout)
     }
@@ -136,12 +136,6 @@ final class WreckingBallDemoViewController: DemoViewController, UICollisionBehav
         let ballProperties = UIDynamicItemBehavior(items: [wreckingBall])
         ballProperties.density = viewModel.wreckingBallDensity
         animator.addBehavior(ballProperties)
-
-        // Kick along the swing arc so the scene opens with a smash.
-        ballProperties.addLinearVelocity(
-            viewModel.launchVelocity(chainDirection: layout.direction),
-            for: wreckingBall
-        )
     }
 
     private func buildTower(chainLength: CGFloat) {
