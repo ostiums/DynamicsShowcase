@@ -1,14 +1,13 @@
 import UIKit
 
-/// A solar system on UIKit Dynamics.
+/// A model solar system on UIKit Dynamics.
 ///
 /// The sun is a `radialGravityField` with `falloff = 2` — a true
 /// inverse-square law, just like Newtonian gravity. Planets are ordinary
 /// dynamic items with zero resistance that get one tangential
-/// `addLinearVelocity` kick at spawn and then coast on their orbits.
-/// Touching the screen adds a second radial field — a wandering black
-/// hole that bends and steals the orbits. Planets flung off screen are
-/// quietly respawned on their home orbit.
+/// `addLinearVelocity` kick at spawn and then coast on circular orbits.
+/// A planet that somehow drifts off screen is quietly respawned on its
+/// home orbit.
 final class SolarSystemDemoViewController: DemoViewController {
 
     private let viewModel = SolarSystemDemoViewModel()
@@ -16,11 +15,9 @@ final class SolarSystemDemoViewController: DemoViewController {
     private var planetViews: [BallView] = []
     private var planetProperties = UIDynamicItemBehavior()
     private var sunField: UIFieldBehavior?
-    private var blackHoleField: UIFieldBehavior?
 
     private var trailLayers: [CAShapeLayer] = []
     private var trailPoints: [[CGPoint]] = []
-    private let blackHoleRing = CAShapeLayer()
     private var displayLink: CADisplayLink?
 
     private var sunCenter: CGPoint {
@@ -32,13 +29,6 @@ final class SolarSystemDemoViewController: DemoViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         showHint(viewModel.hint)
-
-        // A long press with zero duration tracks the finger from the first
-        // instant — the black hole appears on touch, follows, and evaporates
-        // on release.
-        let touch = UILongPressGestureRecognizer(target: self, action: #selector(handleTouch))
-        touch.minimumPressDuration = 0
-        view.addGestureRecognizer(touch)
     }
 
     // The link that draws trails and rescues lost planets runs only while the
@@ -69,7 +59,6 @@ final class SolarSystemDemoViewController: DemoViewController {
         planetViews.removeAll()
         trailLayers.removeAll()
         trailPoints.removeAll()
-        blackHoleField = nil
 
         drawOrbitGuides()
 
@@ -94,14 +83,6 @@ final class SolarSystemDemoViewController: DemoViewController {
         for index in viewModel.planets.indices {
             spawnPlanet(at: index)
         }
-
-        // The black hole ring, hidden until a touch.
-        blackHoleRing.strokeColor = UIColor.white.withAlphaComponent(0.5).cgColor
-        blackHoleRing.fillColor = UIColor.black.withAlphaComponent(0.55).cgColor
-        blackHoleRing.lineWidth = 1.5
-        blackHoleRing.path = UIBezierPath(ovalIn: CGRect(x: -16, y: -16, width: 32, height: 32)).cgPath
-        blackHoleRing.isHidden = true
-        contentView.layer.addSublayer(blackHoleRing)
     }
 
     // MARK: - Scene
@@ -140,7 +121,6 @@ final class SolarSystemDemoViewController: DemoViewController {
 
         planetProperties.addItem(ball)
         sunField?.addItem(ball)
-        blackHoleField?.addItem(ball)
         planetProperties.addLinearVelocity(state.velocity, for: ball)
 
         let trail = CAShapeLayer()
@@ -177,7 +157,7 @@ final class SolarSystemDemoViewController: DemoViewController {
         }
     }
 
-    /// A planet slingshotted beyond the rescue radius silently returns
+    /// A planet that drifted beyond the rescue radius silently returns
     /// to its home orbit with a fresh circular velocity.
     private func rescueIfLost(_ ball: BallView, at index: Int) {
         let distance = hypot(ball.center.x - sunCenter.x, ball.center.y - sunCenter.y)
@@ -194,43 +174,5 @@ final class SolarSystemDemoViewController: DemoViewController {
             for: ball
         )
         trailPoints[index].removeAll()
-    }
-
-    // MARK: - Black hole
-
-    @objc private func handleTouch(_ gesture: UILongPressGestureRecognizer) {
-        let location = gesture.location(in: contentView)
-
-        switch gesture.state {
-        case .began:
-            let hole = UIFieldBehavior.radialGravityField(position: location)
-            hole.strength = viewModel.blackHoleStrength
-            hole.falloff = viewModel.blackHoleFalloff
-            hole.minimumRadius = viewModel.blackHoleMinimumRadius
-            planetViews.forEach { hole.addItem($0) }
-            animator.addBehavior(hole)
-            blackHoleField = hole
-            moveBlackHoleRing(to: location, hidden: false)
-            Haptics.action()
-
-        case .changed:
-            blackHoleField?.position = location
-            moveBlackHoleRing(to: location, hidden: false)
-
-        default:
-            if let blackHoleField {
-                animator.removeBehavior(blackHoleField)
-                self.blackHoleField = nil
-            }
-            moveBlackHoleRing(to: location, hidden: true)
-        }
-    }
-
-    private func moveBlackHoleRing(to point: CGPoint, hidden: Bool) {
-        CATransaction.begin()
-        CATransaction.setDisableActions(true)
-        blackHoleRing.position = point
-        blackHoleRing.isHidden = hidden
-        CATransaction.commit()
     }
 }
