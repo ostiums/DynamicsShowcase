@@ -6,7 +6,7 @@ A demo app showing **everything UIKit Dynamics can do** — the physics engine b
 
 Open `DynamicsShowcase.xcodeproj` in Xcode → Run (⌘R). iOS 16+, no dependencies, no assets — everything is drawn in code.
 
-Jumping straight to a screen for recording: set the `AUTO_OPEN_DEMO` environment variable to `0…6` in the scheme — the app opens that demo immediately.
+Jumping straight to a screen for recording: set the `AUTO_OPEN_DEMO` environment variable to `0…7` in the scheme — the app opens that demo immediately.
 
 ## Screens and API coverage
 
@@ -17,6 +17,7 @@ Jumping straight to a screen for recording: set the `AUTO_OPEN_DEMO` environment
 | ⛓️ Wrecking Ball | `UIAttachmentBehavior` — anchor and item-to-item rigid links; a dense wrecking ball smashes a block tower; drag via an attachment to the finger |
 | 🚀 Push Impulses | `UIPushBehavior` — `.instantaneous` (billiards-style slingshot: force = pull distance, spin via `setTargetOffsetFromCenter`) and `.continuous` with a rotating vector |
 | 🌀 Force Fields | `UIFieldBehavior` — all 10 types: radial, spring, vortex, noise, turbulence, velocity, linear, drag, electric, magnetic (charge via `UIDynamicItemBehavior.charge`), `UIRegion` |
+| 🪐 Solar System | `radialGravityField(falloff: 2)` — a true inverse-square gravity well; planets on calibrated orbits (`linearVelocity(for:)`, `updateItem(usingCurrentState:)`), a black-hole field under the finger |
 | ⚖️ Body Properties | `UIDynamicItemBehavior` — `elasticity`, `density`, `resistance` compared side by side, a floor boundary via `addBoundary(withIdentifier:from:to:)` |
 | 🎪 Playground | everything at once + `UIDynamicItemGroup` (domino pairs on long-press), ramp boundaries, a two-finger magnet, `addLinearVelocity` for throwing |
 
@@ -42,6 +43,7 @@ DynamicsShowcase/
     ├── WreckingBall/       WreckingBallDemoViewModel (chain & tower geometry) + ViewController
     ├── Push/               PushDemoViewModel + ViewController
     ├── Fields/             FieldCatalog (FieldKind + FieldFactory), FieldsDemoViewModel + ViewController
+    ├── SolarSystem/        SolarSystemDemoViewModel (orbital math) + ViewController
     ├── Properties/         PropertiesDemoViewModel + ViewController
     └── Playground/         PlaygroundDemoViewModel + ViewController
 ```
@@ -61,9 +63,10 @@ DynamicsShowcase/
 3. **Snap** (6 s) — tap the corners on "Bouncy 0.2", switch to "Stiff 0.9", tap again.
 4. **Wrecking Ball** (8 s) — let the opening swing smash the tower, then grab the ball and wreck what's left.
 5. **Push** (7 s) — pull back from a puck like a billiards cue and release, pucks ricochet; switch to "Continuous force" for a few seconds.
-6. **Force Fields** (15 s) — the showstopper: Radial → drag the finger around (the swarm chases it) → Vortex (whirlpool) → Spring (pulsing cloud) → Velocity (fountain).
-7. **Body Properties** (5 s) — tap a couple of times: the elasticity difference is instantly visible.
-8. **Playground** (9 s) — pour balls onto the ramps, hold a long-press (domino group), finale — two-finger tap: everything flies into the "magnet" and scatters.
+6. **Force Fields** (13 s) — the showstopper: Radial → drag the finger around (the swarm chases it) → Vortex (whirlpool) → Spring (pulsing cloud) → Velocity (fountain).
+7. **Solar System** (8 s) — let the planets run an orbit, then press a finger down: the black hole drags whole orbits sideways; release and watch them settle.
+8. **Body Properties** (4 s) — tap a couple of times: the elasticity difference is instantly visible.
+9. **Playground** (8 s) — pour balls onto the ramps, hold a long-press (domino group), finale — two-finger tap: everything flies into the "magnet" and scatters.
 
 Tip: the simulator has no haptics; for a recording with sound, use a physical device + QuickTime.
 

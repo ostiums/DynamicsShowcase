@@ -50,6 +50,13 @@ enum DemoCatalog {
             makeViewController: { FieldsDemoViewController() }
         ),
         DemoDescriptor(
+            emoji: "🪐",
+            accentColor: Palette.violet,
+            title: "Solar System",
+            apiSummary: ".radialGravityField(falloff: 2)",
+            makeViewController: { SolarSystemDemoViewController() }
+        ),
+        DemoDescriptor(
             emoji: "⚖️",
             accentColor: Palette.coral,
             title: "Body Properties",
