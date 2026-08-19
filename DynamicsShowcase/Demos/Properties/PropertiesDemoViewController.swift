@@ -1,16 +1,28 @@
 import UIKit
 
-/// UIDynamicItemBehavior: how physical properties change the way bodies move.
-/// "Elasticity" — identical balls with different elasticity dropped at once.
-/// "Density" — the same impulse moves bodies of different density differently.
+/// Demonstrates UIDynamicItemBehavior — the behavior that carries the
+/// physical properties of items.
+///
+/// - "Elasticity": identical balls with different `elasticity` dropped at
+///   once bounce to visibly different heights.
+/// - "Density": the same `UIPushBehavior` impulse moves balls of different
+///   `density` (mass) by visibly different distances.
+///
+/// Each ball gets its own UIDynamicItemBehavior — that per-item control
+/// is exactly what this demo is about.
 final class PropertiesDemoViewController: DemoViewController {
 
-    private let modeControl = UISegmentedControl(items: ["Elasticity", "Density"])
-    private var labels: [UILabel] = []
+    private var viewModel = PropertiesDemoViewModel()
+    private let modeControl = UISegmentedControl()
+
+    // MARK: - Lifecycle
 
     override func viewDidLoad() {
         super.viewDidLoad()
 
+        for (index, mode) in PropertiesDemoViewModel.Mode.allCases.enumerated() {
+            modeControl.insertSegment(withTitle: mode.title, at: index, animated: false)
+        }
         modeControl.selectedSegmentIndex = 0
         modeControl.selectedSegmentTintColor = Palette.coral.withAlphaComponent(0.55)
         modeControl.setTitleTextAttributes([.foregroundColor: UIColor.white], for: .normal)
@@ -26,6 +38,7 @@ final class PropertiesDemoViewController: DemoViewController {
     }
 
     @objc private func modeChanged() {
+        viewModel.mode = PropertiesDemoViewModel.Mode(rawValue: modeControl.selectedSegmentIndex) ?? .elasticity
         replay()
     }
 
@@ -34,24 +47,21 @@ final class PropertiesDemoViewController: DemoViewController {
         animator.removeAllBehaviors()
         contentView.subviews.forEach { $0.removeFromSuperview() }
         contentView.layer.sublayers?.forEach { $0.removeFromSuperlayer() }
-        labels.removeAll()
         buildScene()
     }
 
     override func buildScene() {
-        if modeControl.selectedSegmentIndex == 0 {
-            buildElasticityScene()
-        } else {
-            buildDensityScene()
+        showHint(viewModel.hint)
+        switch viewModel.mode {
+        case .elasticity: buildElasticityScene()
+        case .density: buildDensityScene()
         }
     }
 
     // MARK: - Elasticity
 
     private func buildElasticityScene() {
-        showHint("elasticity 0.1 → 0.95 — same balls, different bounciness.  Tap to replay")
-
-        let values: [CGFloat] = [0.1, 0.4, 0.7, 0.95]
+        let values = viewModel.elasticityValues
         let colors = [Palette.coral, Palette.amber, Palette.mint, Palette.cyan]
         let laneWidth = view.bounds.width / CGFloat(values.count)
 
@@ -62,36 +72,27 @@ final class PropertiesDemoViewController: DemoViewController {
         animator.addBehavior(collision)
 
         // A visible "floor" above the captions and the hint.
-        let floorY = view.bounds.height - 180
+        let floorY = view.bounds.height - viewModel.floorInset
         collision.addBoundary(withIdentifier: "floor" as NSString,
                               from: CGPoint(x: 0, y: floorY),
                               to: CGPoint(x: view.bounds.width, y: floorY))
-        let floorLine = CAShapeLayer()
-        let floorPath = UIBezierPath()
-        floorPath.move(to: CGPoint(x: 16, y: floorY))
-        floorPath.addLine(to: CGPoint(x: view.bounds.width - 16, y: floorY))
-        floorLine.path = floorPath.cgPath
-        floorLine.strokeColor = UIColor.white.withAlphaComponent(0.3).cgColor
-        floorLine.lineWidth = 3
-        floorLine.lineCap = .round
-        contentView.layer.addSublayer(floorLine)
+        drawFloorLine(at: floorY)
 
-        for (i, elasticity) in values.enumerated() {
-            let x = laneWidth * (CGFloat(i) + 0.5)
+        for (index, elasticity) in values.enumerated() {
+            let x = laneWidth * (CGFloat(index) + 0.5)
 
-            let ball = BallView(diameter: 52, color: colors[i])
+            let ball = BallView(diameter: viewModel.ballDiameter, color: colors[index])
             ball.center = CGPoint(x: x, y: view.safeAreaInsets.top + 130)
             contentView.addSubview(ball)
 
-            // Each ball gets its own behavior — that's the whole point of the demo.
-            let props = UIDynamicItemBehavior(items: [ball])
-            props.elasticity = elasticity
-            animator.addBehavior(props)
+            let properties = UIDynamicItemBehavior(items: [ball])
+            properties.elasticity = elasticity
+            animator.addBehavior(properties)
 
             gravity.addItem(ball)
             collision.addItem(ball)
 
-            addCaption(String(format: "%.2f", elasticity), color: colors[i],
+            addCaption(String(format: "%.2f", elasticity), color: colors[index],
                        at: CGPoint(x: x, y: floorY + 28))
         }
     }
@@ -99,44 +100,55 @@ final class PropertiesDemoViewController: DemoViewController {
     // MARK: - Density
 
     private func buildDensityScene() {
-        showHint("density 0.3 → 2.4 — same impulse, different mass.  Tap to replay")
-
-        let values: [CGFloat] = [0.3, 0.8, 1.5, 2.4]
+        let values = viewModel.densityValues
         let colors = [Palette.cyan, Palette.mint, Palette.amber, Palette.coral]
         let topY = view.safeAreaInsets.top + 150
-        let laneHeight: CGFloat = 110
 
         let collision = UICollisionBehavior()
         collision.translatesReferenceBoundsIntoBoundary = true
         animator.addBehavior(collision)
 
-        for (i, density) in values.enumerated() {
-            let y = topY + CGFloat(i) * laneHeight
+        for (index, density) in values.enumerated() {
+            let y = topY + CGFloat(index) * viewModel.laneHeight
 
-            let separator = UIView(frame: CGRect(x: 16, y: y + laneHeight / 2 - 8,
+            let separator = UIView(frame: CGRect(x: 16, y: y + viewModel.laneHeight / 2 - 8,
                                                  width: view.bounds.width - 32, height: 1))
             separator.backgroundColor = UIColor.white.withAlphaComponent(0.08)
             contentView.addSubview(separator)
 
-            let ball = BallView(diameter: 50, color: colors[i])
+            let ball = BallView(diameter: viewModel.ballDiameter, color: colors[index])
             ball.center = CGPoint(x: 60, y: y)
             contentView.addSubview(ball)
 
-            let props = UIDynamicItemBehavior(items: [ball])
-            props.density = density
-            props.resistance = 1.6
-            props.elasticity = 0.4
-            animator.addBehavior(props)
+            let properties = UIDynamicItemBehavior(items: [ball])
+            properties.density = density
+            properties.resistance = viewModel.densityResistance
+            properties.elasticity = viewModel.densityElasticity
+            animator.addBehavior(properties)
             collision.addItem(ball)
 
-            // The exact same impulse for everyone.
+            // The exact same impulse for every ball.
             let push = UIPushBehavior(items: [ball], mode: .instantaneous)
-            push.pushDirection = CGVector(dx: 1.6, dy: 0)
+            push.pushDirection = viewModel.sharedImpulse
             animator.addBehavior(push)
 
-            addCaption(String(format: "density %.1f", density), color: colors[i],
+            addCaption(String(format: "density %.1f", density), color: colors[index],
                        at: CGPoint(x: 76, y: y - 42))
         }
+    }
+
+    // MARK: - Decorations
+
+    private func drawFloorLine(at y: CGFloat) {
+        let line = CAShapeLayer()
+        let path = UIBezierPath()
+        path.move(to: CGPoint(x: 16, y: y))
+        path.addLine(to: CGPoint(x: view.bounds.width - 16, y: y))
+        line.path = path.cgPath
+        line.strokeColor = UIColor.white.withAlphaComponent(0.3).cgColor
+        line.lineWidth = 3
+        line.lineCap = .round
+        contentView.layer.addSublayer(line)
     }
 
     private func addCaption(_ text: String, color: UIColor, at point: CGPoint) {
@@ -147,6 +159,5 @@ final class PropertiesDemoViewController: DemoViewController {
         label.sizeToFit()
         label.center = point
         contentView.addSubview(label)
-        labels.append(label)
     }
 }

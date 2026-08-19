@@ -1,5 +1,6 @@
 import UIKit
 
+/// The app's color palette: a dark background with a set of neon accents.
 enum Palette {
     static let backgroundTop = UIColor(red: 0.04, green: 0.05, blue: 0.12, alpha: 1)
     static let backgroundBottom = UIColor(red: 0.10, green: 0.06, blue: 0.20, alpha: 1)
@@ -17,25 +18,8 @@ enum Palette {
     static func randomNeon() -> UIColor { neon.randomElement()! }
 }
 
-enum Haptics {
-    private static let light = UIImpactFeedbackGenerator(style: .light)
-    private static let rigid = UIImpactFeedbackGenerator(style: .rigid)
-    private static var lastFire: CFTimeInterval = 0
-
-    /// Collisions fire dozens of times per second — throttle so the Taptic Engine keeps up.
-    static func collision(intensity: CGFloat = 0.6) {
-        let now = CACurrentMediaTime()
-        guard now - lastFire > 0.06 else { return }
-        lastFire = now
-        light.impactOccurred(intensity: intensity)
-    }
-
-    static func action() {
-        rigid.impactOccurred(intensity: 0.8)
-    }
-}
-
 extension UIFont {
+    /// The same font with the SF Rounded design, when available.
     func rounded() -> UIFont {
         guard let descriptor = fontDescriptor.withDesign(.rounded) else { return self }
         return UIFont(descriptor: descriptor, size: pointSize)
@@ -43,6 +27,8 @@ extension UIFont {
 }
 
 extension UIColor {
+    /// A lighter (factor > 1) or darker (factor < 1) variant of the color,
+    /// used to shade the radial gradients of the balls.
     func adjusted(brightnessBy factor: CGFloat) -> UIColor {
         var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
         guard getHue(&h, saturation: &s, brightness: &b, alpha: &a) else { return self }

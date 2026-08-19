@@ -1,15 +1,21 @@
 import UIKit
 
-/// UIPushBehavior: air hockey.
-/// Flick — an instantaneous impulse (.instantaneous) with spin via the force
-/// application point. "Continuous" mode — a constant force with a rotating vector.
+/// Demonstrates UIPushBehavior in both of its modes.
+///
+/// - `.instantaneous` — a one-shot impulse: flick a puck and the gesture
+///   velocity becomes the push vector; pushing off-center adds spin via
+///   `setTargetOffsetFromCenter(_:for:)`.
+/// - `.continuous` — a constant force applied every frame; here its angle
+///   slowly rotates, swirling all the pucks around the table.
 final class PushDemoViewController: DemoViewController, UICollisionBehaviorDelegate {
+
+    private let viewModel = PushDemoViewModel()
 
     private var pucks: [BallView] = []
     private var collision = UICollisionBehavior()
-    private var properties = UIDynamicItemBehavior()
+    private var puckProperties = UIDynamicItemBehavior()
 
-    private let modeControl = UISegmentedControl(items: ["Impulse", "Continuous force"])
+    private let modeControl = UISegmentedControl()
     private var continuousPush: UIPushBehavior?
     private var rotationLink: CADisplayLink?
 
@@ -17,10 +23,18 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
     private var flickStart: CGPoint = .zero
     private weak var flickTarget: BallView?
 
+    private var mode: PushDemoViewModel.Mode {
+        PushDemoViewModel.Mode(rawValue: modeControl.selectedSegmentIndex) ?? .impulse
+    }
+
+    // MARK: - Lifecycle
+
     override func viewDidLoad() {
         super.viewDidLoad()
-        showHint("Flick a puck — an instantaneous impulse.  Force = gesture velocity")
 
+        for (index, mode) in PushDemoViewModel.Mode.allCases.enumerated() {
+            modeControl.insertSegment(withTitle: mode.title, at: index, animated: false)
+        }
         modeControl.selectedSegmentIndex = 0
         modeControl.selectedSegmentTintColor = Palette.mint.withAlphaComponent(0.5)
         modeControl.setTitleTextAttributes([.foregroundColor: UIColor.white], for: .normal)
@@ -31,7 +45,9 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
             modeControl.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             modeControl.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 12),
         ])
+        showHint(mode.hint)
 
+        // Dashed aiming line shown while flicking.
         flickLayer.strokeColor = UIColor.white.withAlphaComponent(0.5).cgColor
         flickLayer.lineWidth = 2
         flickLayer.lineDashPattern = [4, 6]
@@ -52,41 +68,37 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
         rotationLink = nil
 
         collision = UICollisionBehavior()
-        properties = UIDynamicItemBehavior()
-
         collision.translatesReferenceBoundsIntoBoundary = true
         collision.collisionDelegate = self
 
-        properties.elasticity = 0.9
-        properties.friction = 0.02
-        properties.resistance = 0.35
-        properties.density = 0.6
-        properties.allowsRotation = true
+        puckProperties = UIDynamicItemBehavior()
+        puckProperties.elasticity = viewModel.elasticity
+        puckProperties.friction = viewModel.friction
+        puckProperties.resistance = viewModel.resistance
+        puckProperties.density = viewModel.density
+        puckProperties.allowsRotation = true
 
         animator.addBehavior(collision)
-        animator.addBehavior(properties)
+        animator.addBehavior(puckProperties)
 
-        let center = CGPoint(x: view.bounds.midX, y: view.bounds.midY)
-        for i in 0..<5 {
-            let angle = CGFloat(i) * (.pi * 2 / 5) - .pi / 2
-            let puck = BallView(diameter: 54, color: Palette.neon[i])
-            puck.center = CGPoint(x: center.x + cos(angle) * 110,
-                                  y: center.y + sin(angle) * 110)
+        for (index, center) in viewModel.puckCenters(in: view.bounds).enumerated() {
+            let puck = BallView(diameter: viewModel.puckDiameter, color: Palette.neon[index])
+            puck.center = center
             contentView.addSubview(puck)
             pucks.append(puck)
             collision.addItem(puck)
-            properties.addItem(puck)
+            puckProperties.addItem(puck)
         }
 
-        if modeControl.selectedSegmentIndex == 1 {
+        if mode == .continuous {
             startContinuousPush()
         }
     }
 
-    // MARK: - Flick (instantaneous)
+    // MARK: - Flick (.instantaneous)
 
     @objc private func handlePan(_ pan: UIPanGestureRecognizer) {
-        guard modeControl.selectedSegmentIndex == 0 else { return }
+        guard mode == .impulse else { return }
         let location = pan.location(in: contentView)
 
         switch pan.state {
@@ -106,18 +118,16 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
 
         case .ended:
             flickLayer.path = nil
-            guard let puck = flickTarget else { return }
-            let velocity = pan.velocity(in: contentView)
-            let speed = hypot(velocity.x, velocity.y)
-            guard speed > 100 else { return }
+            guard let puck = flickTarget,
+                  let impulse = viewModel.impulseVector(forGestureVelocity: pan.velocity(in: contentView))
+            else { return }
 
             let push = UIPushBehavior(items: [puck], mode: .instantaneous)
-            push.pushDirection = CGVector(dx: velocity.x / 700, dy: velocity.y / 700)
-
-            // Applying the force off-center makes the puck spin.
-            let offset = UIOffset(horizontal: (flickStart.x - puck.center.x).clamped(to: -20...20),
-                                  vertical: (flickStart.y - puck.center.y).clamped(to: -20...20))
-            push.setTargetOffsetFromCenter(offset, for: puck)
+            push.pushDirection = impulse
+            push.setTargetOffsetFromCenter(
+                viewModel.spinOffset(fromTouch: flickStart, puckCenter: puck.center),
+                for: puck
+            )
 
             // An instantaneous push fires once — remove the behavior afterwards.
             push.action = { [weak self, weak push] in
@@ -133,14 +143,13 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
         }
     }
 
-    // MARK: - Continuous force
+    // MARK: - Continuous force (.continuous)
 
     @objc private func modeChanged() {
-        if modeControl.selectedSegmentIndex == 1 {
-            showHint("UIPushBehavior(.continuous) — constant force with a slowly rotating vector")
+        showHint(mode.hint)
+        if mode == .continuous {
             startContinuousPush()
         } else {
-            showHint("Flick a puck — an instantaneous impulse.  Force = gesture velocity")
             stopContinuousPush()
         }
     }
@@ -148,7 +157,7 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
     private func startContinuousPush() {
         stopContinuousPush()
         let push = UIPushBehavior(items: pucks, mode: .continuous)
-        push.magnitude = 0.4
+        push.magnitude = viewModel.continuousMagnitude
         push.angle = -.pi / 2
         animator.addBehavior(push)
         continuousPush = push
@@ -167,7 +176,7 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
     }
 
     @objc private func rotatePushVector() {
-        continuousPush?.angle += 0.02
+        continuousPush?.angle += viewModel.continuousRotationStep
     }
 
     // MARK: - UICollisionBehaviorDelegate
@@ -187,11 +196,5 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
                            at p: CGPoint) {
         (item as? BallView)?.flash()
         Haptics.collision(intensity: 0.4)
-    }
-}
-
-extension CGFloat {
-    func clamped(to range: ClosedRange<CGFloat>) -> CGFloat {
-        Swift.min(Swift.max(self, range.lowerBound), range.upperBound)
     }
 }

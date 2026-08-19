@@ -1,23 +1,32 @@
 import UIKit
 
-/// The grand finale: everything at once.
-/// Gravity, slanted ramp boundaries, balls on tap, domino pairs (UIDynamicItemGroup)
-/// on long-press, dragging any item, and a two-finger-tap magnet.
+/// The grand finale: several behaviors composed in one scene.
+///
+/// - Gravity + collisions with slanted ramp boundaries.
+/// - Tap spawns a ball; long-press spawns a domino pair driven by
+///   `UIDynamicItemGroup` (two views moving as one rigid body).
+/// - Pan drags an item with an attachment and throws it with the
+///   gesture velocity on release.
+/// - Two-finger tap is a "magnet": temporary snaps gather everything
+///   around the touch point, then release it back to gravity.
 final class PlaygroundDemoViewController: DemoViewController, UICollisionBehaviorDelegate {
+
+    private let viewModel = PlaygroundDemoViewModel()
 
     private var gravity = UIGravityBehavior()
     private var collision = UICollisionBehavior()
-    private var properties = UIDynamicItemBehavior()
+    private var itemProperties = UIDynamicItemBehavior()
 
     private var items: [UIView] = []
-    private var groups: [UIDynamicItemGroup] = []
     private var dragAttachment: UIAttachmentBehavior?
     private weak var draggedView: UIView?
     private var magnetSnaps: [UISnapBehavior] = []
 
+    // MARK: - Lifecycle
+
     override func viewDidLoad() {
         super.viewDidLoad()
-        showHint("Tap — ball · long-press — domino group · drag & throw · two-finger tap — magnet")
+        showHint(viewModel.hint)
 
         view.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(handleTap)))
         view.addGestureRecognizer(UILongPressGestureRecognizer(target: self, action: #selector(handleLongPress)))
@@ -30,50 +39,43 @@ final class PlaygroundDemoViewController: DemoViewController, UICollisionBehavio
 
     override func buildScene() {
         items.removeAll()
-        groups.removeAll()
         magnetSnaps.removeAll()
 
         gravity = UIGravityBehavior()
-        collision = UICollisionBehavior()
-        properties = UIDynamicItemBehavior()
 
+        collision = UICollisionBehavior()
         collision.translatesReferenceBoundsIntoBoundary = true
         collision.collisionDelegate = self
-        properties.elasticity = 0.55
-        properties.friction = 0.2
-        properties.resistance = 0.1
+
+        itemProperties = UIDynamicItemBehavior()
+        itemProperties.elasticity = viewModel.elasticity
+        itemProperties.friction = viewModel.friction
+        itemProperties.resistance = viewModel.resistance
 
         animator.addBehavior(gravity)
         animator.addBehavior(collision)
-        animator.addBehavior(properties)
+        animator.addBehavior(itemProperties)
 
         addRamps()
 
-        for i in 0..<6 {
-            DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.12) { [weak self] in
+        for i in 0..<viewModel.initialBallCount {
+            DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * viewModel.spawnInterval) { [weak self] in
                 guard let self else { return }
-                self.spawnBall(at: CGPoint(x: .random(in: 40...(self.view.bounds.width - 40)),
-                                           y: .random(in: 110...200)))
+                self.spawnBall(at: self.viewModel.rainSpawnPoint(in: self.view.bounds))
             }
         }
     }
 
     /// Slanted ramps: collision boundary lines drawn as glowing layers.
     private func addRamps() {
-        let w = view.bounds.width
-        let h = view.bounds.height
-        let ramps: [(CGPoint, CGPoint)] = [
-            (CGPoint(x: 0, y: h * 0.32), CGPoint(x: w * 0.62, y: h * 0.42)),
-            (CGPoint(x: w, y: h * 0.55), CGPoint(x: w * 0.38, y: h * 0.67)),
-        ]
-
-        for (i, ramp) in ramps.enumerated() {
-            collision.addBoundary(withIdentifier: "ramp\(i)" as NSString, from: ramp.0, to: ramp.1)
+        for (index, ramp) in viewModel.rampEndpoints(in: view.bounds).enumerated() {
+            collision.addBoundary(withIdentifier: "ramp\(index)" as NSString,
+                                  from: ramp.from, to: ramp.to)
 
             let line = CAShapeLayer()
             let path = UIBezierPath()
-            path.move(to: ramp.0)
-            path.addLine(to: ramp.1)
+            path.move(to: ramp.from)
+            path.addLine(to: ramp.to)
             line.path = path.cgPath
             line.strokeColor = UIColor.white.withAlphaComponent(0.35).cgColor
             line.lineWidth = 3
@@ -89,20 +91,22 @@ final class PlaygroundDemoViewController: DemoViewController, UICollisionBehavio
     // MARK: - Spawning
 
     private func spawnBall(at point: CGPoint) {
-        let ball = BallView(diameter: .random(in: 32...58), color: Palette.randomNeon())
+        let ball = BallView(diameter: .random(in: viewModel.ballDiameterRange),
+                            color: Palette.randomNeon())
         ball.center = point
         contentView.addSubview(ball)
         items.append(ball)
 
         gravity.addItem(ball)
         collision.addItem(ball)
-        properties.addItem(ball)
+        itemProperties.addItem(ball)
         trimItems()
     }
 
     /// UIDynamicItemGroup: two squares move as a single rigid body.
+    /// The group itself is added to the behaviors — not its members.
     private func spawnGroup(at point: CGPoint) {
-        let size: CGFloat = 34
+        let size = viewModel.groupBoxSize
         let color = Palette.randomNeon()
         let left = BoxView(size: size, color: color)
         let right = BoxView(size: size, color: color.adjusted(brightnessBy: 1.4))
@@ -114,19 +118,18 @@ final class PlaygroundDemoViewController: DemoViewController, UICollisionBehavio
         items.append(right)
 
         let group = UIDynamicItemGroup(items: [left, right])
-        groups.append(group)
         gravity.addItem(group)
         collision.addItem(group)
-        properties.addItem(group)
+        itemProperties.addItem(group)
     }
 
     private func trimItems() {
-        guard items.count > 34 else { return }
+        guard items.count > viewModel.maxItemCount else { return }
         let old = items.removeFirst()
         guard !(old is BoxView) else { return } // don't break up groups, only drop balls
         gravity.removeItem(old)
         collision.removeItem(old)
-        properties.removeItem(old)
+        itemProperties.removeItem(old)
         UIView.animate(withDuration: 0.2, animations: { old.alpha = 0 }) { _ in
             old.removeFromSuperview()
         }
@@ -154,7 +157,7 @@ final class PlaygroundDemoViewController: DemoViewController, UICollisionBehavio
             guard let target = items
                 .filter({ !($0 is BoxView) })
                 .map({ ($0, hypot($0.center.x - location.x, $0.center.y - location.y)) })
-                .filter({ $0.1 < 80 })
+                .filter({ $0.1 < viewModel.grabRadius })
                 .min(by: { $0.1 < $1.1 })?
                 .0
             else { return }
@@ -174,8 +177,9 @@ final class PlaygroundDemoViewController: DemoViewController, UICollisionBehavio
             // Throw: hand the gesture velocity over to the item.
             if let draggedView {
                 let velocity = pan.velocity(in: contentView)
-                properties.addLinearVelocity(
-                    CGPoint(x: velocity.x * 0.8, y: velocity.y * 0.8),
+                itemProperties.addLinearVelocity(
+                    CGPoint(x: velocity.x * viewModel.throwVelocityFactor,
+                            y: velocity.y * viewModel.throwVelocityFactor),
                     for: draggedView
                 )
                 self.draggedView = nil
@@ -183,7 +187,7 @@ final class PlaygroundDemoViewController: DemoViewController, UICollisionBehavio
         }
     }
 
-    /// Magnet: every item flies to the touch point, then falls again a second later.
+    /// Magnet: every ball flies to the touch point, then falls again.
     @objc private func handleMagnet(_ tap: UITapGestureRecognizer) {
         let point = tap.location(in: contentView)
         Haptics.action()
@@ -192,18 +196,15 @@ final class PlaygroundDemoViewController: DemoViewController, UICollisionBehavio
         magnetSnaps.removeAll()
 
         let balls = items.filter { $0 is BallView }
-        for (i, item) in balls.enumerated() {
-            let angle = CGFloat(i) * (.pi * 2 / CGFloat(max(balls.count, 1)))
-            let radius = CGFloat(40 + (i % 3) * 34)
-            let target = CGPoint(x: point.x + cos(angle) * radius,
-                                 y: point.y + sin(angle) * radius)
-            let snap = UISnapBehavior(item: item, snapTo: target)
-            snap.damping = 0.4
+        let targets = viewModel.magnetTargets(around: point, count: balls.count)
+        for (ball, target) in zip(balls, targets) {
+            let snap = UISnapBehavior(item: ball, snapTo: target)
+            snap.damping = viewModel.magnetDamping
             animator.addBehavior(snap)
             magnetSnaps.append(snap)
         }
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.1) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + viewModel.magnetHoldDuration) { [weak self] in
             guard let self else { return }
             self.magnetSnaps.forEach { self.animator.removeBehavior($0) }
             self.magnetSnaps.removeAll()
