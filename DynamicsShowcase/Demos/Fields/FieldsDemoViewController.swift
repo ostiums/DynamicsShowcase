@@ -38,6 +38,7 @@ final class FieldsDemoViewController: DemoViewController {
         particleProperties = UIDynamicItemBehavior()
         particleProperties.density = viewModel.particleDensity
         particleProperties.resistance = viewModel.particleResistance
+        particleProperties.elasticity = viewModel.particleElasticity
         particleProperties.allowsRotation = false
         particleProperties.charge = viewModel.particleCharge
 

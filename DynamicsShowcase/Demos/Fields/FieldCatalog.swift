@@ -19,7 +19,7 @@ enum FieldKind: String, CaseIterable {
         case .spring: return ".springField — a spring toward the field center, the swarm pulses"
         case .vortex: return ".vortexField — swirls particles around the finger"
         case .noise: return ".noiseField — random force, Brownian motion"
-        case .turbulence: return ".turbulenceField — turbulence, force depends on velocity"
+        case .turbulence: return ".turbulenceField — scatters the swarm boiling around a soft spring"
         case .velocity: return ".velocityField — an upward jet + gravity = fountain"
         case .linear: return ".linearGravityField — linear gravity across the field region"
         case .drag: return ".dragField — a viscosity zone: particles get stuck inside the circle"
@@ -79,9 +79,17 @@ enum FieldFactory {
             return [field]
 
         case .turbulence:
+            // Turbulence force scales with the item's velocity, so on its own it
+            // dies out: resistance slows the particles, the force fades with the
+            // speed, and the swarm freezes. A soft spring toward the field center
+            // keeps the particles perpetually falling through it — and that motion
+            // is what the turbulence scatters into a boiling swarm.
             let field = UIFieldBehavior.turbulenceField(smoothness: 0.4, animationSpeed: 6)
-            field.strength = 6
-            return [field]
+            field.strength = 4
+            let hold = UIFieldBehavior.springField()
+            hold.position = position
+            hold.strength = 0.15
+            return [field, hold]
 
         case .velocity:
             // A local upward jet plus global gravity — a fountain.

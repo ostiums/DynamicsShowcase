@@ -15,6 +15,8 @@ struct FieldsDemoViewModel {
     let particleDiameterRange: ClosedRange<CGFloat> = 9...16
     let particleDensity: CGFloat = 0.4
     let particleResistance: CGFloat = 0.8
+    /// Without elasticity the particles would stick to the walls dead on impact.
+    let particleElasticity: CGFloat = 0.6
     /// Electric and magnetic fields act only on charged items.
     let particleCharge: CGFloat = 1.0
 
