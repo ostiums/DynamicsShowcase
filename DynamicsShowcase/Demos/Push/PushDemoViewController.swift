@@ -57,15 +57,24 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
         view.addGestureRecognizer(UIPanGestureRecognizer(target: self, action: #selector(handlePan)))
     }
 
-    deinit {
-        rotationLink?.invalidate()
+    // A CADisplayLink retains its target, so it only runs while the screen is on
+    // screen — otherwise it would keep this controller alive forever.
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        if continuousPush != nil {
+            startRotationLink()
+        }
+    }
+
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+        stopRotationLink()
     }
 
     override func buildScene() {
         pucks.removeAll()
         continuousPush = nil
-        rotationLink?.invalidate()
-        rotationLink = nil
+        stopRotationLink()
 
         collision = UICollisionBehavior()
         collision.translatesReferenceBoundsIntoBoundary = true
@@ -104,10 +113,7 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
         switch pan.state {
         case .began:
             flickStart = location
-            flickTarget = pucks
-                .map { ($0, hypot($0.center.x - location.x, $0.center.y - location.y)) }
-                .min { $0.1 < $1.1 }?
-                .0
+            flickTarget = pucks.nearest(to: location)
 
         case .changed:
             guard let puck = flickTarget else { return }
@@ -161,9 +167,7 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
         push.angle = -.pi / 2
         animator.addBehavior(push)
         continuousPush = push
-
-        rotationLink = CADisplayLink(target: self, selector: #selector(rotatePushVector))
-        rotationLink?.add(to: .main, forMode: .common)
+        startRotationLink()
     }
 
     private func stopContinuousPush() {
@@ -171,6 +175,17 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
             animator.removeBehavior(continuousPush)
             self.continuousPush = nil
         }
+        stopRotationLink()
+    }
+
+    private func startRotationLink() {
+        stopRotationLink()
+        let link = CADisplayLink(target: self, selector: #selector(rotatePushVector))
+        link.add(to: .main, forMode: .common)
+        rotationLink = link
+    }
+
+    private func stopRotationLink() {
         rotationLink?.invalidate()
         rotationLink = nil
     }
@@ -185,16 +200,13 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
                            beganContactFor item1: UIDynamicItem,
                            with item2: UIDynamicItem,
                            at p: CGPoint) {
-        (item1 as? BallView)?.flash()
-        (item2 as? BallView)?.flash()
-        Haptics.collision()
+        reactToContact(item1, item2, intensity: 0.6)
     }
 
     func collisionBehavior(_ behavior: UICollisionBehavior,
                            beganContactFor item: UIDynamicItem,
                            withBoundaryIdentifier identifier: NSCopying?,
                            at p: CGPoint) {
-        (item as? BallView)?.flash()
-        Haptics.collision(intensity: 0.4)
+        reactToContact(item, intensity: 0.4)
     }
 }

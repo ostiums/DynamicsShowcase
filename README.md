@@ -17,8 +17,8 @@ Jumping straight to a screen for recording: set the `AUTO_OPEN_DEMO` environment
 | ⛓️ Wrecking Ball | `UIAttachmentBehavior` — anchor and item-to-item rigid links; a dense wrecking ball smashes a block tower; drag via an attachment to the finger |
 | 🚀 Push Impulses | `UIPushBehavior` — `.instantaneous` (force = flick velocity, spin via `setTargetOffsetFromCenter`) and `.continuous` with a rotating vector |
 | 🌀 Force Fields | `UIFieldBehavior` — all 10 types: radial, spring, vortex, noise, turbulence, velocity, linear, drag, electric, magnetic (charge via `UIDynamicItemBehavior.charge`), `UIRegion` |
-| ⚖️ Body Properties | `UIDynamicItemBehavior` — `elasticity`, `density`, `resistance`, `addLinearVelocity`, a floor boundary via `addBoundary(withIdentifier:from:to:)` |
-| 🎪 Playground | everything at once + `UIDynamicItemGroup` (domino pairs on long-press), ramp boundaries, a two-finger magnet |
+| ⚖️ Body Properties | `UIDynamicItemBehavior` — `elasticity`, `density`, `resistance` compared side by side, a floor boundary via `addBoundary(withIdentifier:from:to:)` |
+| 🎪 Playground | everything at once + `UIDynamicItemGroup` (domino pairs on long-press), ramp boundaries, a two-finger magnet, `addLinearVelocity` for throwing |
 
 ## Architecture
 
@@ -32,8 +32,9 @@ Lightweight MVVM, adapted to the nature of UIKit Dynamics. The physics engine an
 ```
 DynamicsShowcase/
 ├── App/                    AppDelegate, SceneDelegate
-├── Core/                   Theme, Haptics, item views, DemoViewController (base class:
-│                           gradient background, animator, hint pill, reset button)
+├── Core/                   Theme, Haptics, item views, shared geometry helpers,
+│                           DemoViewController (base class: gradient background,
+│                           animator, hint pill, reset button, collision response)
 ├── Menu/                   DemoCatalog (model), MenuViewModel, MenuViewController, DemoCardCell
 └── Demos/
     ├── Gravity/            GravityDemoViewModel + ViewController

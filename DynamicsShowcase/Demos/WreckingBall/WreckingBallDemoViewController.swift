@@ -19,7 +19,16 @@ final class WreckingBallDemoViewController: DemoViewController, UICollisionBehav
     private var collision = UICollisionBehavior()
     private var dragAttachment: UIAttachmentBehavior?
 
-    private let linkLayer = CAShapeLayer()
+    /// Draws the rope between the anchor and the balls, beneath them.
+    private let linkLayer: CAShapeLayer = {
+        let layer = CAShapeLayer()
+        layer.strokeColor = UIColor.white.withAlphaComponent(0.35).cgColor
+        layer.lineWidth = 2.5
+        layer.lineCap = .round
+        layer.fillColor = nil
+        return layer
+    }()
+
     private var displayLink: CADisplayLink?
 
     private var anchorPoint: CGPoint {
@@ -33,14 +42,31 @@ final class WreckingBallDemoViewController: DemoViewController, UICollisionBehav
         showHint(viewModel.hint)
 
         view.addGestureRecognizer(UIPanGestureRecognizer(target: self, action: #selector(handlePan)))
-
-        // Redraws the chain links every frame while the physics runs.
-        displayLink = CADisplayLink(target: self, selector: #selector(redrawLinks))
-        displayLink?.add(to: .main, forMode: .common)
     }
 
-    deinit {
+    // The link that redraws the chain runs only while the screen is visible.
+    // A CADisplayLink retains its target, so one that lived as long as the
+    // controller would keep the controller alive forever — deinit would never run.
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        startDisplayLink()
+    }
+
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+        stopDisplayLink()
+    }
+
+    private func startDisplayLink() {
+        stopDisplayLink()
+        let link = CADisplayLink(target: self, selector: #selector(redrawLinks))
+        link.add(to: .main, forMode: .common)
+        displayLink = link
+    }
+
+    private func stopDisplayLink() {
         displayLink?.invalidate()
+        displayLink = nil
     }
 
     override func buildScene() {
@@ -53,11 +79,7 @@ final class WreckingBallDemoViewController: DemoViewController, UICollisionBehav
         animator.addBehavior(gravity)
         animator.addBehavior(collision)
 
-        // Chain links are drawn beneath the balls.
-        linkLayer.strokeColor = UIColor.white.withAlphaComponent(0.35).cgColor
-        linkLayer.lineWidth = 2.5
-        linkLayer.lineCap = .round
-        linkLayer.fillColor = nil
+        // Added first so the balls drawn afterwards cover the rope ends.
         contentView.layer.addSublayer(linkLayer)
 
         addAnchorDot()
@@ -82,8 +104,6 @@ final class WreckingBallDemoViewController: DemoViewController, UICollisionBehav
     }
 
     private func buildChain(with layout: WreckingBallDemoViewModel.ChainLayout) {
-        let colors = [Palette.violet, Palette.cyan, Palette.magenta, Palette.mint, Palette.amber]
-
         let chainProperties = UIDynamicItemBehavior()
         chainProperties.elasticity = viewModel.chainElasticity
         chainProperties.resistance = viewModel.chainResistance
@@ -91,8 +111,8 @@ final class WreckingBallDemoViewController: DemoViewController, UICollisionBehav
         animator.addBehavior(chainProperties)
 
         var previous: BallView?
-        for (index, diameter) in viewModel.ballDiameters.enumerated() {
-            let ball = BallView(diameter: diameter, color: colors[index])
+        for (index, link) in viewModel.chainBalls.enumerated() {
+            let ball = BallView(diameter: link.diameter, color: link.color)
             ball.center = layout.ballCenter(at: index, anchor: anchorPoint)
             contentView.addSubview(ball)
             chain.append(ball)
@@ -133,7 +153,8 @@ final class WreckingBallDemoViewController: DemoViewController, UICollisionBehav
         collision.addBoundary(withIdentifier: "platform" as NSString,
                               from: layout.platformStart,
                               to: layout.platformEnd)
-        drawPlatform(from: layout.platformStart, to: layout.platformEnd)
+        contentView.layer.addSublayer(CAShapeLayer.boundaryLine(from: layout.platformStart,
+                                                                to: layout.platformEnd))
 
         let blockProperties = UIDynamicItemBehavior()
         blockProperties.density = viewModel.blockDensity
@@ -151,22 +172,6 @@ final class WreckingBallDemoViewController: DemoViewController, UICollisionBehav
         }
     }
 
-    private func drawPlatform(from start: CGPoint, to end: CGPoint) {
-        let line = CAShapeLayer()
-        let path = UIBezierPath()
-        path.move(to: start)
-        path.addLine(to: end)
-        line.path = path.cgPath
-        line.strokeColor = UIColor.white.withAlphaComponent(0.35).cgColor
-        line.lineWidth = 3
-        line.lineCap = .round
-        line.shadowColor = Palette.cyan.cgColor
-        line.shadowOpacity = 0.8
-        line.shadowRadius = 6
-        line.shadowOffset = .zero
-        contentView.layer.addSublayer(line)
-    }
-
     // MARK: - Gestures
 
     @objc private func handlePan(_ pan: UIPanGestureRecognizer) {
@@ -174,7 +179,7 @@ final class WreckingBallDemoViewController: DemoViewController, UICollisionBehav
 
         switch pan.state {
         case .began:
-            guard let ball = nearestBall(to: location, maxDistance: 80) else { return }
+            guard let ball = chain.nearest(to: location, within: viewModel.grabRadius) else { return }
             let attachment = UIAttachmentBehavior(item: ball, attachedToAnchor: location)
             animator.addBehavior(attachment)
             dragAttachment = attachment
@@ -189,14 +194,6 @@ final class WreckingBallDemoViewController: DemoViewController, UICollisionBehav
                 self.dragAttachment = nil
             }
         }
-    }
-
-    private func nearestBall(to point: CGPoint, maxDistance: CGFloat) -> BallView? {
-        chain
-            .map { ($0, hypot($0.center.x - point.x, $0.center.y - point.y)) }
-            .filter { $0.1 < maxDistance }
-            .min { $0.1 < $1.1 }?
-            .0
     }
 
     // MARK: - Link drawing
@@ -220,8 +217,6 @@ final class WreckingBallDemoViewController: DemoViewController, UICollisionBehav
                            beganContactFor item1: UIDynamicItem,
                            with item2: UIDynamicItem,
                            at p: CGPoint) {
-        (item1 as? BallView)?.flash()
-        (item2 as? BallView)?.flash()
-        Haptics.collision(intensity: 0.5)
+        reactToContact(item1, item2, intensity: 0.5)
     }
 }

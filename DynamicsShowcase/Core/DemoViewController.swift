@@ -56,6 +56,12 @@ class DemoViewController: UIViewController {
 
     @objc private func resetTapped() {
         Haptics.action()
+        resetScene()
+    }
+
+    /// Tears the scene down and builds it again. Bound to the reset button;
+    /// demos that rebuild on their own (a mode switch, a replay tap) call it too.
+    func resetScene() {
         animator.removeAllBehaviors()
         contentView.subviews.forEach { $0.removeFromSuperview() }
         contentView.layer.sublayers?.forEach { $0.removeFromSuperlayer() }
@@ -71,4 +77,14 @@ class DemoViewController: UIViewController {
     /// Behaviors must be created fresh here: reused behavior instances would still
     /// reference items removed by a previous reset.
     func buildScene() { }
+
+    /// The reaction every UICollisionBehaviorDelegate in this project shares:
+    /// a glow pulse on each ball involved plus a haptic tick. Only the tick
+    /// intensity differs from demo to demo.
+    func reactToContact(_ items: UIDynamicItem..., intensity: CGFloat) {
+        for item in items {
+            (item as? BallView)?.flash()
+        }
+        Haptics.collision(intensity: intensity)
+    }
 }

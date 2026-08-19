@@ -54,6 +54,35 @@ final class GradientBackgroundView: UIView {
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 }
 
+extension CAShapeLayer {
+    /// Line that makes a collision boundary visible — a ramp, a platform, a floor.
+    /// The boundary itself is added to the collision behavior; this layer is only
+    /// its decoration, so the two always have to be created together.
+    static func boundaryLine(from start: CGPoint,
+                             to end: CGPoint,
+                             color: UIColor = UIColor.white.withAlphaComponent(0.35),
+                             glow: UIColor? = Palette.cyan) -> CAShapeLayer {
+        let path = UIBezierPath()
+        path.move(to: start)
+        path.addLine(to: end)
+
+        let line = CAShapeLayer()
+        line.path = path.cgPath
+        line.strokeColor = color.cgColor
+        line.fillColor = nil
+        line.lineWidth = 3
+        line.lineCap = .round
+
+        if let glow {
+            line.shadowColor = glow.cgColor
+            line.shadowOpacity = 0.8
+            line.shadowRadius = 6
+            line.shadowOffset = .zero
+        }
+        return line
+    }
+}
+
 /// Bottom-of-screen hint pill.
 final class HintLabel: UILabel {
     private let insets = UIEdgeInsets(top: 10, left: 16, bottom: 10, right: 16)

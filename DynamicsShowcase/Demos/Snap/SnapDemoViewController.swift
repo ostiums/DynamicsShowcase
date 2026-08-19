@@ -40,14 +40,13 @@ final class SnapDemoViewController: DemoViewController {
         tiles.removeAll()
         snaps.removeAll()
 
-        let colors = [Palette.magenta, Palette.cyan, Palette.amber, Palette.mint]
         let centers = viewModel.initialTileCenters(in: view.bounds)
 
-        for (index, letter) in viewModel.tileLetters.enumerated() {
-            let tile = BoxView(size: viewModel.tileSize, color: colors[index], letter: letter)
-            tile.center = centers[index]
-            contentView.addSubview(tile)
-            tiles.append(tile)
+        for (index, tile) in viewModel.tiles.enumerated() {
+            let box = BoxView(size: viewModel.tileSize, color: tile.color, letter: tile.letter)
+            box.center = centers[index]
+            contentView.addSubview(box)
+            tiles.append(box)
         }
     }
 

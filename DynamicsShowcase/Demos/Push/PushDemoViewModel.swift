@@ -1,4 +1,3 @@
-import CoreGraphics
 import UIKit
 
 /// Configuration and impulse math for the push demo.
@@ -70,11 +69,5 @@ struct PushDemoViewModel {
     func spinOffset(fromTouch touch: CGPoint, puckCenter: CGPoint) -> UIOffset {
         UIOffset(horizontal: (touch.x - puckCenter.x).clamped(to: -maxSpinOffset...maxSpinOffset),
                  vertical: (touch.y - puckCenter.y).clamped(to: -maxSpinOffset...maxSpinOffset))
-    }
-}
-
-extension CGFloat {
-    func clamped(to range: ClosedRange<CGFloat>) -> CGFloat {
-        Swift.min(Swift.max(self, range.lowerBound), range.upperBound)
     }
 }

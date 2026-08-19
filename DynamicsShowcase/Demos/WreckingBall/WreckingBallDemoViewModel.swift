@@ -1,4 +1,4 @@
-import CoreGraphics
+import UIKit
 
 /// Pure geometry of the wrecking-ball scene: chain layout, tower placement
 /// and the launch kick. All the tricky math lives here, fully testable and
@@ -7,10 +7,28 @@ struct WreckingBallDemoViewModel {
 
     let hint = "Drag the ball and smash the tower.  Anchor + item-to-item rigid links"
 
-    /// Ball diameters from the anchor down; the last one is the wrecking ball.
-    let ballDiameters: [CGFloat] = [32, 30, 28, 26, 64]
+    /// One link of the chain.
+    struct ChainBall {
+        let diameter: CGFloat
+        let color: UIColor
+    }
+
+    /// The chain from the anchor down; the last, heaviest ball is the wrecking ball.
+    let chainBalls: [ChainBall] = [
+        ChainBall(diameter: 32, color: Palette.violet),
+        ChainBall(diameter: 30, color: Palette.cyan),
+        ChainBall(diameter: 28, color: Palette.magenta),
+        ChainBall(diameter: 26, color: Palette.mint),
+        ChainBall(diameter: 64, color: Palette.amber),
+    ]
+
+    /// Diameter of the wrecking ball at the end of the chain.
+    private var wreckingBallDiameter: CGFloat { chainBalls.last?.diameter ?? 0 }
+
     let firstLinkLength: CGFloat = 70
     let linkGap: CGFloat = 14
+    /// Radius within which a pan grabs a ball of the chain.
+    let grabRadius: CGFloat = 80
 
     // Physical tuning.
     let chainElasticity: CGFloat = 0.3
@@ -50,15 +68,15 @@ struct WreckingBallDemoViewModel {
     func chainLayout(anchor: CGPoint, in bounds: CGRect) -> ChainLayout {
         var distances: [CGFloat] = []
         var reach = firstLinkLength
-        for (index, diameter) in ballDiameters.enumerated() {
+        for (index, ball) in chainBalls.enumerated() {
             if index > 0 {
-                reach += ballDiameters[index - 1] / 2 + diameter / 2 + linkGap
+                reach += chainBalls[index - 1].diameter / 2 + ball.diameter / 2 + linkGap
             }
             distances.append(reach)
         }
 
         let length = distances.last ?? 1
-        let maxDx = bounds.width - anchor.x - (ballDiameters.last ?? 0) / 2 - 12
+        let maxDx = bounds.width - anchor.x - wreckingBallDiameter / 2 - 12
         let sine = min(0.85, maxDx / length)
         let direction = CGVector(dx: sine, dy: sqrt(1 - sine * sine))
 
@@ -91,8 +109,7 @@ struct WreckingBallDemoViewModel {
     /// which is why it ends shortly after the tower.
     func towerLayout(anchor: CGPoint, chainLength: CGFloat, in bounds: CGRect) -> TowerLayout {
         let towerX: CGFloat = 90
-        let ballRadius = (ballDiameters.last ?? 0) / 2
-        let clearance = ballRadius + 16
+        let clearance = wreckingBallDiameter / 2 + 16
 
         let dx = towerX - anchor.x
         let sweepY = anchor.y + sqrt(max(0, chainLength * chainLength - dx * dx))

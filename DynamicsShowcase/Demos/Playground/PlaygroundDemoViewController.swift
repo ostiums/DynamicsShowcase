@@ -21,6 +21,7 @@ final class PlaygroundDemoViewController: DemoViewController, UICollisionBehavio
     private var dragAttachment: UIAttachmentBehavior?
     private weak var draggedView: UIView?
     private var magnetSnaps: [UISnapBehavior] = []
+    private var pendingSpawns: [DispatchWorkItem] = []
 
     // MARK: - Lifecycle
 
@@ -40,6 +41,7 @@ final class PlaygroundDemoViewController: DemoViewController, UICollisionBehavio
     override func buildScene() {
         items.removeAll()
         magnetSnaps.removeAll()
+        cancelPendingSpawns()
 
         gravity = UIGravityBehavior()
 
@@ -57,13 +59,7 @@ final class PlaygroundDemoViewController: DemoViewController, UICollisionBehavio
         animator.addBehavior(itemProperties)
 
         addRamps()
-
-        for i in 0..<viewModel.initialBallCount {
-            DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * viewModel.spawnInterval) { [weak self] in
-                guard let self else { return }
-                self.spawnBall(at: self.viewModel.rainSpawnPoint(in: self.view.bounds))
-            }
-        }
+        scheduleOpeningRain()
     }
 
     /// Slanted ramps: collision boundary lines drawn as glowing layers.
@@ -71,24 +67,31 @@ final class PlaygroundDemoViewController: DemoViewController, UICollisionBehavio
         for (index, ramp) in viewModel.rampEndpoints(in: view.bounds).enumerated() {
             collision.addBoundary(withIdentifier: "ramp\(index)" as NSString,
                                   from: ramp.from, to: ramp.to)
-
-            let line = CAShapeLayer()
-            let path = UIBezierPath()
-            path.move(to: ramp.from)
-            path.addLine(to: ramp.to)
-            line.path = path.cgPath
-            line.strokeColor = UIColor.white.withAlphaComponent(0.35).cgColor
-            line.lineWidth = 3
-            line.lineCap = .round
-            line.shadowColor = Palette.cyan.cgColor
-            line.shadowOpacity = 0.8
-            line.shadowRadius = 6
-            line.shadowOffset = .zero
-            contentView.layer.addSublayer(line)
+            contentView.layer.addSublayer(CAShapeLayer.boundaryLine(from: ramp.from, to: ramp.to))
         }
     }
 
     // MARK: - Spawning
+
+    /// Opening rain of balls. The spawns are kept as work items so a reset can
+    /// cancel the ones still pending — otherwise they would rain into the scene
+    /// that replaced them.
+    private func scheduleOpeningRain() {
+        for index in 0..<viewModel.initialBallCount {
+            let spawn = DispatchWorkItem { [weak self] in
+                guard let self else { return }
+                self.spawnBall(at: self.viewModel.rainSpawnPoint(in: self.view.bounds))
+            }
+            pendingSpawns.append(spawn)
+            DispatchQueue.main.asyncAfter(deadline: .now() + Double(index) * viewModel.spawnInterval,
+                                          execute: spawn)
+        }
+    }
+
+    private func cancelPendingSpawns() {
+        pendingSpawns.forEach { $0.cancel() }
+        pendingSpawns.removeAll()
+    }
 
     private func spawnBall(at point: CGPoint) {
         let ball = BallView(diameter: .random(in: viewModel.ballDiameterRange),
@@ -123,10 +126,15 @@ final class PlaygroundDemoViewController: DemoViewController, UICollisionBehavio
         itemProperties.addItem(group)
     }
 
+    /// Keeps the scene light by dropping the oldest ball.
+    /// Group members (the BoxViews) are skipped rather than removed: a
+    /// UIDynamicItemGroup member can't be taken out on its own, and dropping it
+    /// from `items` would leave it in the scene untracked by the magnet and the drag.
     private func trimItems() {
-        guard items.count > viewModel.maxItemCount else { return }
-        let old = items.removeFirst()
-        guard !(old is BoxView) else { return } // don't break up groups, only drop balls
+        guard items.count > viewModel.maxItemCount,
+              let oldestBallIndex = items.firstIndex(where: { $0 is BallView })
+        else { return }
+        let old = items.remove(at: oldestBallIndex)
         gravity.removeItem(old)
         collision.removeItem(old)
         itemProperties.removeItem(old)
@@ -154,12 +162,8 @@ final class PlaygroundDemoViewController: DemoViewController, UICollisionBehavio
         switch pan.state {
         case .began:
             // Group members can't be dragged individually — UIDynamicItemGroup owns them.
-            guard let target = items
-                .filter({ !($0 is BoxView) })
-                .map({ ($0, hypot($0.center.x - location.x, $0.center.y - location.y)) })
-                .filter({ $0.1 < viewModel.grabRadius })
-                .min(by: { $0.1 < $1.1 })?
-                .0
+            let grabbable = items.filter { !($0 is BoxView) }
+            guard let target = grabbable.nearest(to: location, within: viewModel.grabRadius)
             else { return }
             draggedView = target
             let attachment = UIAttachmentBehavior(item: target, attachedToAnchor: location)
@@ -192,8 +196,7 @@ final class PlaygroundDemoViewController: DemoViewController, UICollisionBehavio
         let point = tap.location(in: contentView)
         Haptics.action()
 
-        magnetSnaps.forEach { animator.removeBehavior($0) }
-        magnetSnaps.removeAll()
+        releaseMagnet()
 
         let balls = items.filter { $0 is BallView }
         let targets = viewModel.magnetTargets(around: point, count: balls.count)
@@ -205,10 +208,14 @@ final class PlaygroundDemoViewController: DemoViewController, UICollisionBehavio
         }
 
         DispatchQueue.main.asyncAfter(deadline: .now() + viewModel.magnetHoldDuration) { [weak self] in
-            guard let self else { return }
-            self.magnetSnaps.forEach { self.animator.removeBehavior($0) }
-            self.magnetSnaps.removeAll()
+            self?.releaseMagnet()
         }
+    }
+
+    /// Drops the snaps so the gathered items fall back under gravity.
+    private func releaseMagnet() {
+        magnetSnaps.forEach { animator.removeBehavior($0) }
+        magnetSnaps.removeAll()
     }
 
     // MARK: - UICollisionBehaviorDelegate
@@ -217,8 +224,6 @@ final class PlaygroundDemoViewController: DemoViewController, UICollisionBehavio
                            beganContactFor item1: UIDynamicItem,
                            with item2: UIDynamicItem,
                            at p: CGPoint) {
-        (item1 as? BallView)?.flash()
-        (item2 as? BallView)?.flash()
-        Haptics.collision(intensity: 0.45)
+        reactToContact(item1, item2, intensity: 0.45)
     }
 }

@@ -42,12 +42,10 @@ final class PropertiesDemoViewController: DemoViewController {
         replay()
     }
 
+    /// Both scenes are static: they play out once and are rebuilt to run again.
     @objc private func replay() {
         Haptics.action()
-        animator.removeAllBehaviors()
-        contentView.subviews.forEach { $0.removeFromSuperview() }
-        contentView.layer.sublayers?.forEach { $0.removeFromSuperlayer() }
-        buildScene()
+        resetScene()
     }
 
     override func buildScene() {
@@ -61,9 +59,8 @@ final class PropertiesDemoViewController: DemoViewController {
     // MARK: - Elasticity
 
     private func buildElasticityScene() {
-        let values = viewModel.elasticityValues
-        let colors = [Palette.coral, Palette.amber, Palette.mint, Palette.cyan]
-        let laneWidth = view.bounds.width / CGFloat(values.count)
+        let lanes = viewModel.elasticityLanes
+        let laneWidth = view.bounds.width / CGFloat(lanes.count)
 
         let gravity = UIGravityBehavior()
         let collision = UICollisionBehavior()
@@ -76,23 +73,28 @@ final class PropertiesDemoViewController: DemoViewController {
         collision.addBoundary(withIdentifier: "floor" as NSString,
                               from: CGPoint(x: 0, y: floorY),
                               to: CGPoint(x: view.bounds.width, y: floorY))
-        drawFloorLine(at: floorY)
+        contentView.layer.addSublayer(CAShapeLayer.boundaryLine(
+            from: CGPoint(x: 16, y: floorY),
+            to: CGPoint(x: view.bounds.width - 16, y: floorY),
+            color: UIColor.white.withAlphaComponent(0.3),
+            glow: nil
+        ))
 
-        for (index, elasticity) in values.enumerated() {
+        for (index, lane) in lanes.enumerated() {
             let x = laneWidth * (CGFloat(index) + 0.5)
 
-            let ball = BallView(diameter: viewModel.ballDiameter, color: colors[index])
+            let ball = BallView(diameter: viewModel.ballDiameter, color: lane.color)
             ball.center = CGPoint(x: x, y: view.safeAreaInsets.top + 130)
             contentView.addSubview(ball)
 
             let properties = UIDynamicItemBehavior(items: [ball])
-            properties.elasticity = elasticity
+            properties.elasticity = lane.value
             animator.addBehavior(properties)
 
             gravity.addItem(ball)
             collision.addItem(ball)
 
-            addCaption(String(format: "%.2f", elasticity), color: colors[index],
+            addCaption(String(format: "%.2f", lane.value), color: lane.color,
                        at: CGPoint(x: x, y: floorY + 28))
         }
     }
@@ -100,15 +102,13 @@ final class PropertiesDemoViewController: DemoViewController {
     // MARK: - Density
 
     private func buildDensityScene() {
-        let values = viewModel.densityValues
-        let colors = [Palette.cyan, Palette.mint, Palette.amber, Palette.coral]
         let topY = view.safeAreaInsets.top + 150
 
         let collision = UICollisionBehavior()
         collision.translatesReferenceBoundsIntoBoundary = true
         animator.addBehavior(collision)
 
-        for (index, density) in values.enumerated() {
+        for (index, lane) in viewModel.densityLanes.enumerated() {
             let y = topY + CGFloat(index) * viewModel.laneHeight
 
             let separator = UIView(frame: CGRect(x: 16, y: y + viewModel.laneHeight / 2 - 8,
@@ -116,12 +116,12 @@ final class PropertiesDemoViewController: DemoViewController {
             separator.backgroundColor = UIColor.white.withAlphaComponent(0.08)
             contentView.addSubview(separator)
 
-            let ball = BallView(diameter: viewModel.ballDiameter, color: colors[index])
+            let ball = BallView(diameter: viewModel.ballDiameter, color: lane.color)
             ball.center = CGPoint(x: 60, y: y)
             contentView.addSubview(ball)
 
             let properties = UIDynamicItemBehavior(items: [ball])
-            properties.density = density
+            properties.density = lane.value
             properties.resistance = viewModel.densityResistance
             properties.elasticity = viewModel.densityElasticity
             animator.addBehavior(properties)
@@ -132,24 +132,12 @@ final class PropertiesDemoViewController: DemoViewController {
             push.pushDirection = viewModel.sharedImpulse
             animator.addBehavior(push)
 
-            addCaption(String(format: "density %.1f", density), color: colors[index],
+            addCaption(String(format: "density %.1f", lane.value), color: lane.color,
                        at: CGPoint(x: 76, y: y - 42))
         }
     }
 
     // MARK: - Decorations
-
-    private func drawFloorLine(at y: CGFloat) {
-        let line = CAShapeLayer()
-        let path = UIBezierPath()
-        path.move(to: CGPoint(x: 16, y: y))
-        path.addLine(to: CGPoint(x: view.bounds.width - 16, y: y))
-        line.path = path.cgPath
-        line.strokeColor = UIColor.white.withAlphaComponent(0.3).cgColor
-        line.lineWidth = 3
-        line.lineCap = .round
-        contentView.layer.addSublayer(line)
-    }
 
     private func addCaption(_ text: String, color: UIColor, at point: CGPoint) {
         let label = UILabel()

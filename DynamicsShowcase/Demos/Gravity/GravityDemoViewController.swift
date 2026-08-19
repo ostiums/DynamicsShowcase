@@ -14,6 +14,7 @@ final class GravityDemoViewController: DemoViewController, UICollisionBehaviorDe
     private var collision = UICollisionBehavior()
     private var ballProperties = UIDynamicItemBehavior()
     private var balls: [BallView] = []
+    private var pendingSpawns: [DispatchWorkItem] = []
 
     private let arrow = UIImageView(image: UIImage(
         systemName: "location.north.fill",
@@ -40,6 +41,7 @@ final class GravityDemoViewController: DemoViewController, UICollisionBehaviorDe
 
     override func buildScene() {
         balls.removeAll()
+        cancelPendingSpawns()
 
         gravity = UIGravityBehavior()
 
@@ -58,17 +60,30 @@ final class GravityDemoViewController: DemoViewController, UICollisionBehaviorDe
         animator.addBehavior(ballProperties)
 
         updateArrow()
-
-        // Opening rain of balls — looks great from the first second of a recording.
-        for i in 0..<viewModel.initialBallCount {
-            DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * viewModel.spawnInterval) { [weak self] in
-                guard let self else { return }
-                self.spawnBall(at: self.viewModel.rainSpawnPoint(in: self.view.bounds))
-            }
-        }
+        scheduleOpeningRain()
     }
 
     // MARK: - Scene
+
+    /// Opening rain of balls — looks great from the first second of a recording.
+    /// The spawns are kept as work items so a reset can cancel the ones still
+    /// pending; otherwise they would rain into the scene that replaced them.
+    private func scheduleOpeningRain() {
+        for index in 0..<viewModel.initialBallCount {
+            let spawn = DispatchWorkItem { [weak self] in
+                guard let self else { return }
+                self.spawnBall(at: self.viewModel.rainSpawnPoint(in: self.view.bounds))
+            }
+            pendingSpawns.append(spawn)
+            DispatchQueue.main.asyncAfter(deadline: .now() + Double(index) * viewModel.spawnInterval,
+                                          execute: spawn)
+        }
+    }
+
+    private func cancelPendingSpawns() {
+        pendingSpawns.forEach { $0.cancel() }
+        pendingSpawns.removeAll()
+    }
 
     private func spawnBall(at point: CGPoint) {
         let ball = BallView(diameter: .random(in: viewModel.ballDiameterRange),
@@ -122,16 +137,13 @@ final class GravityDemoViewController: DemoViewController, UICollisionBehaviorDe
                            beganContactFor item1: UIDynamicItem,
                            with item2: UIDynamicItem,
                            at p: CGPoint) {
-        (item1 as? BallView)?.flash()
-        (item2 as? BallView)?.flash()
-        Haptics.collision(intensity: 0.5)
+        reactToContact(item1, item2, intensity: 0.5)
     }
 
     func collisionBehavior(_ behavior: UICollisionBehavior,
                            beganContactFor item: UIDynamicItem,
                            withBoundaryIdentifier identifier: NSCopying?,
                            at p: CGPoint) {
-        (item as? BallView)?.flash()
-        Haptics.collision(intensity: 0.7)
+        reactToContact(item, intensity: 0.7)
     }
 }
