@@ -32,7 +32,7 @@ final class GravityDemoViewController: DemoViewController, UICollisionBehaviorDe
         view.addSubview(arrow)
         NSLayoutConstraint.activate([
             arrow.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            arrow.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 18),
+            arrow.centerYAnchor.constraint(equalTo: view.centerYAnchor),
         ])
 
         view.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(handleTap)))
