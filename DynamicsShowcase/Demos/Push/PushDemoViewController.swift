@@ -48,7 +48,7 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
         ])
         showHint(mode.hint)
 
-        // Dashed aiming line: finger → puck → projected shot direction.
+        // Dashed pull-back line: finger → puck.
         aimLayer.strokeColor = UIColor.white.withAlphaComponent(0.5).cgColor
         aimLayer.lineWidth = 2
         aimLayer.lineDashPattern = [4, 6]
@@ -118,7 +118,7 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
 
         case .changed:
             guard let puck = aimedPuck else { return }
-            drawAimLine(from: location, through: puck.center)
+            drawAimLine(from: location, to: puck.center)
 
         case .ended:
             aimLayer.path = nil
@@ -147,23 +147,11 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
         }
     }
 
-    /// The pull-back segment (finger → puck) continues past the puck to show
-    /// where the shot will go — opposite to the pull, like a billiards cue.
-    private func drawAimLine(from location: CGPoint, through puckCenter: CGPoint) {
+    /// The pull-back segment: finger → puck. The shot goes the opposite way.
+    private func drawAimLine(from location: CGPoint, to puckCenter: CGPoint) {
         let path = UIBezierPath()
         path.move(to: location)
         path.addLine(to: puckCenter)
-
-        let dx = puckCenter.x - location.x
-        let dy = puckCenter.y - location.y
-        let distance = hypot(dx, dy)
-        if distance > 1 {
-            let length = min(distance, viewModel.maximumAimLength)
-            path.addLine(to: CGPoint(
-                x: puckCenter.x + dx / distance * length,
-                y: puckCenter.y + dy / distance * length
-            ))
-        }
         aimLayer.path = path.cgPath
     }
 

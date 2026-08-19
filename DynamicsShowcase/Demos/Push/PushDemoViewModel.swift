@@ -43,8 +43,6 @@ struct PushDemoViewModel {
     let maximumPushMagnitude: CGFloat = 8
     /// Cap for the spin offset so pucks don't spin absurdly fast.
     let maxSpinOffset: CGFloat = 20
-    /// Longest projected shot-direction segment of the aiming line.
-    let maximumAimLength: CGFloat = 140
 
     let continuousMagnitude: CGFloat = 0.4
     /// Radians added to the continuous push angle every display frame.
