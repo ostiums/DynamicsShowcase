@@ -265,5 +265,4 @@ itemProperties.addLinearVelocity(
     pan.velocity(in: view),
     for: draggedBall
 )
-
 */

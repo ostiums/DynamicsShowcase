@@ -206,5 +206,4 @@ particles.forEach { field.addItem($0) }
 
 // Point-based fields follow the finger.
 field.position = touchLocation
-
 */

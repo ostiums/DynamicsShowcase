@@ -90,5 +90,4 @@ for (tile, target) in zip(tiles, targetsAroundFinger) {
     snap.damping = 0.5  // 0 — maximum wobble … 1 — dead stop
     animator.addBehavior(snap)
 }
-
 */

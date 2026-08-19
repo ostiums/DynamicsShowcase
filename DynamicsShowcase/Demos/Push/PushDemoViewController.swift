@@ -243,5 +243,4 @@ animator.addBehavior(push)
 // The other mode, .continuous, applies the force every frame;
 // slowly rotating its angle swirls all the pucks around the table.
 continuousPush.angle += 0.02
-
 */

@@ -202,5 +202,4 @@ space.addLinearVelocity(
     CGPoint(x: -dy / r * speed, y: dx / r * speed),
     for: planet
 )
-
 */

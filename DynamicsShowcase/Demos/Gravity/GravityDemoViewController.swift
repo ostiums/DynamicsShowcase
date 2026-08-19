@@ -172,14 +172,10 @@ collision.translatesReferenceBoundsIntoBoundary = true  // screen edges become w
 animator.addBehavior(gravity)
 animator.addBehavior(collision)
 
-// Every tap drops one more ball into the simulation.
-let ball = BallView(diameter: 44, color: .cyan)
-ball.center = tapLocation
-view.addSubview(ball)
+// Every tap hands one more ball over to the simulation.
 gravity.addItem(ball)
 collision.addItem(ball)
 
 // Pan steers the gravity vector — the whole world tilts after the finger.
 gravity.gravityDirection = CGVector(dx: cos(angle), dy: sin(angle))
-
 */
