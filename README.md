@@ -66,3 +66,7 @@ DynamicsShowcase/
 8. **Playground** (9 s) — pour balls onto the ramps, hold a long-press (domino group), finale — two-finger tap: everything flies into the "magnet" and scatters.
 
 Tip: the simulator has no haptics; for a recording with sound, use a physical device + QuickTime.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
