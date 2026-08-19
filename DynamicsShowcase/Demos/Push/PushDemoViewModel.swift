@@ -18,7 +18,7 @@ struct PushDemoViewModel {
         var hint: String {
             switch self {
             case .impulse:
-                return "Flick a puck — an instantaneous impulse.  Force = gesture velocity"
+                return "Pull back from a puck and release — it shoots the other way, billiards-style"
             case .continuous:
                 return "UIPushBehavior(.continuous) — constant force with a slowly rotating vector"
             }
@@ -35,12 +35,16 @@ struct PushDemoViewModel {
     let resistance: CGFloat = 0.35
     let density: CGFloat = 0.6
 
-    /// Gestures slower than this don't produce a push.
-    let minimumFlickSpeed: CGFloat = 100
-    /// Scales gesture velocity (pt/s) down to push magnitude units.
-    let flickForceDivisor: CGFloat = 700
+    /// Pulls shorter than this don't fire a shot.
+    let minimumPullDistance: CGFloat = 20
+    /// Scales the pull distance (pt) down to push magnitude units.
+    let pullForceDivisor: CGFloat = 30
+    /// Cap so a pull across the whole screen doesn't launch a puck into orbit.
+    let maximumPushMagnitude: CGFloat = 8
     /// Cap for the spin offset so pucks don't spin absurdly fast.
     let maxSpinOffset: CGFloat = 20
+    /// Longest projected shot-direction segment of the aiming line.
+    let maximumAimLength: CGFloat = 140
 
     let continuousMagnitude: CGFloat = 0.4
     /// Radians added to the continuous push angle every display frame.
@@ -51,23 +55,36 @@ struct PushDemoViewModel {
         let center = CGPoint(x: bounds.midX, y: bounds.midY)
         return (0..<puckCount).map { index in
             let angle = CGFloat(index) * (.pi * 2 / CGFloat(puckCount)) - .pi / 2
-            return CGPoint(x: center.x + cos(angle) * ringRadius,
-                           y: center.y + sin(angle) * ringRadius)
+            return CGPoint(
+                x: center.x + cos(angle) * ringRadius,
+                y: center.y + sin(angle) * ringRadius
+            )
         }
     }
 
-    /// Push vector for a flick, or nil when the gesture was too slow.
-    /// UIPushBehavior treats the vector's length as the force magnitude.
-    func impulseVector(forGestureVelocity velocity: CGPoint) -> CGVector? {
-        guard hypot(velocity.x, velocity.y) > minimumFlickSpeed else { return nil }
-        return CGVector(dx: velocity.x / flickForceDivisor,
-                        dy: velocity.y / flickForceDivisor)
+    /// Billiards-style shot: the puck flies opposite to the pull, and the
+    /// farther the finger is pulled back, the harder the shot. Returns nil
+    /// when the pull is too short. UIPushBehavior treats the vector's
+    /// length as the force magnitude.
+    func impulseVector(pullingFrom location: CGPoint, puckCenter: CGPoint) -> CGVector? {
+        let dx = puckCenter.x - location.x
+        let dy = puckCenter.y - location.y
+        let distance = hypot(dx, dy)
+        guard distance > minimumPullDistance else { return nil }
+
+        let magnitude = min(distance / pullForceDivisor, maximumPushMagnitude)
+        return CGVector(
+            dx: dx / distance * magnitude,
+            dy: dy / distance * magnitude
+        )
     }
 
-    /// Offset of the force application point from the puck's center.
-    /// An off-center push adds angular velocity — the puck spins.
-    func spinOffset(fromTouch touch: CGPoint, puckCenter: CGPoint) -> UIOffset {
-        UIOffset(horizontal: (touch.x - puckCenter.x).clamped(to: -maxSpinOffset...maxSpinOffset),
-                 vertical: (touch.y - puckCenter.y).clamped(to: -maxSpinOffset...maxSpinOffset))
+    /// Offset of the force application point from the puck's center — where
+    /// the "cue" struck. An off-center push adds angular velocity: the puck spins.
+    func spinOffset(fromGrab grab: CGPoint, puckCenter: CGPoint) -> UIOffset {
+        UIOffset(
+            horizontal: (grab.x - puckCenter.x).clamped(to: -maxSpinOffset...maxSpinOffset),
+            vertical: (grab.y - puckCenter.y).clamped(to: -maxSpinOffset...maxSpinOffset)
+        )
     }
 }

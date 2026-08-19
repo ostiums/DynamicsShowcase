@@ -38,8 +38,10 @@ struct SnapDemoViewModel {
         let totalWidth = CGFloat(count) * tileSize + CGFloat(count - 1) * tileSpacing
         let startX = (bounds.width - totalWidth) / 2 + tileSize / 2
         return (0..<count).map { index in
-            CGPoint(x: startX + CGFloat(index) * (tileSize + tileSpacing),
-                    y: bounds.midY)
+            CGPoint(
+                x: startX + CGFloat(index) * (tileSize + tileSpacing),
+                y: bounds.midY
+            )
         }
     }
 

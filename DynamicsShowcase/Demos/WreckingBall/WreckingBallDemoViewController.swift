@@ -145,16 +145,22 @@ final class WreckingBallDemoViewController: DemoViewController, UICollisionBehav
     }
 
     private func buildTower(chainLength: CGFloat) {
-        let layout = viewModel.towerLayout(anchor: anchorPoint,
-                                           chainLength: chainLength,
-                                           in: view.bounds)
+        let layout = viewModel.towerLayout(
+            anchor: anchorPoint,
+            chainLength: chainLength,
+            in: view.bounds
+        )
 
         // The pedestal is a line boundary; blocks rest on it until hit.
-        collision.addBoundary(withIdentifier: "platform" as NSString,
-                              from: layout.platformStart,
-                              to: layout.platformEnd)
-        contentView.layer.addSublayer(CAShapeLayer.boundaryLine(from: layout.platformStart,
-                                                                to: layout.platformEnd))
+        collision.addBoundary(
+            withIdentifier: "platform" as NSString,
+            from: layout.platformStart,
+            to: layout.platformEnd
+        )
+        contentView.layer.addSublayer(CAShapeLayer.boundaryLine(
+            from: layout.platformStart,
+            to: layout.platformEnd
+        ))
 
         let blockProperties = UIDynamicItemBehavior()
         blockProperties.density = viewModel.blockDensity
@@ -213,10 +219,12 @@ final class WreckingBallDemoViewController: DemoViewController, UICollisionBehav
 
     // MARK: - UICollisionBehaviorDelegate
 
-    func collisionBehavior(_ behavior: UICollisionBehavior,
-                           beganContactFor item1: UIDynamicItem,
-                           with item2: UIDynamicItem,
-                           at p: CGPoint) {
+    func collisionBehavior(
+        _ behavior: UICollisionBehavior,
+        beganContactFor item1: UIDynamicItem,
+        with item2: UIDynamicItem,
+        at p: CGPoint
+    ) {
         reactToContact(item1, item2, intensity: 0.5)
     }
 }

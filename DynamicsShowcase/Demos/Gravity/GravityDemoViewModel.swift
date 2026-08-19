@@ -38,7 +38,9 @@ struct GravityDemoViewModel {
     /// an item spawned above the screen would land on top of the outer
     /// collision boundary instead of falling into view.
     func rainSpawnPoint(in bounds: CGRect) -> CGPoint {
-        CGPoint(x: .random(in: 40...(bounds.width - 40)),
-                y: .random(in: 130...300))
+        CGPoint(
+            x: .random(in: 40...(bounds.width - 40)),
+            y: .random(in: 130...300)
+        )
     }
 }

@@ -38,8 +38,10 @@ struct PlaygroundDemoViewModel {
     /// Spawn point for the opening balls — inside the collision bounds,
     /// above the first ramp.
     func rainSpawnPoint(in bounds: CGRect) -> CGPoint {
-        CGPoint(x: .random(in: 40...(bounds.width - 40)),
-                y: .random(in: 110...200))
+        CGPoint(
+            x: .random(in: 40...(bounds.width - 40)),
+            y: .random(in: 110...200)
+        )
     }
 
     /// Ring targets around the magnet point, spread over a few radii
@@ -48,8 +50,10 @@ struct PlaygroundDemoViewModel {
         (0..<count).map { index in
             let angle = CGFloat(index) * (.pi * 2 / CGFloat(max(count, 1)))
             let radius = CGFloat(40 + (index % 3) * 34)
-            return CGPoint(x: point.x + cos(angle) * radius,
-                           y: point.y + sin(angle) * radius)
+            return CGPoint(
+                x: point.x + cos(angle) * radius,
+                y: point.y + sin(angle) * radius
+            )
         }
     }
 }

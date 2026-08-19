@@ -70,9 +70,11 @@ final class PropertiesDemoViewController: DemoViewController {
 
         // A visible "floor" above the captions and the hint.
         let floorY = view.bounds.height - viewModel.floorInset
-        collision.addBoundary(withIdentifier: "floor" as NSString,
-                              from: CGPoint(x: 0, y: floorY),
-                              to: CGPoint(x: view.bounds.width, y: floorY))
+        collision.addBoundary(
+            withIdentifier: "floor" as NSString,
+            from: CGPoint(x: 0, y: floorY),
+            to: CGPoint(x: view.bounds.width, y: floorY)
+        )
         contentView.layer.addSublayer(CAShapeLayer.boundaryLine(
             from: CGPoint(x: 16, y: floorY),
             to: CGPoint(x: view.bounds.width - 16, y: floorY),
@@ -94,8 +96,11 @@ final class PropertiesDemoViewController: DemoViewController {
             gravity.addItem(ball)
             collision.addItem(ball)
 
-            addCaption(String(format: "%.2f", lane.value), color: lane.color,
-                       at: CGPoint(x: x, y: floorY + 28))
+            addCaption(
+                String(format: "%.2f", lane.value),
+                color: lane.color,
+                at: CGPoint(x: x, y: floorY + 28)
+            )
         }
     }
 
@@ -111,8 +116,12 @@ final class PropertiesDemoViewController: DemoViewController {
         for (index, lane) in viewModel.densityLanes.enumerated() {
             let y = topY + CGFloat(index) * viewModel.laneHeight
 
-            let separator = UIView(frame: CGRect(x: 16, y: y + viewModel.laneHeight / 2 - 8,
-                                                 width: view.bounds.width - 32, height: 1))
+            let separator = UIView(frame: CGRect(
+                x: 16,
+                y: y + viewModel.laneHeight / 2 - 8,
+                width: view.bounds.width - 32,
+                height: 1
+            ))
             separator.backgroundColor = UIColor.white.withAlphaComponent(0.08)
             contentView.addSubview(separator)
 
@@ -132,8 +141,11 @@ final class PropertiesDemoViewController: DemoViewController {
             push.pushDirection = viewModel.sharedImpulse
             animator.addBehavior(push)
 
-            addCaption(String(format: "density %.1f", lane.value), color: lane.color,
-                       at: CGPoint(x: 76, y: y - 42))
+            addCaption(
+                String(format: "density %.1f", lane.value),
+                color: lane.color,
+                at: CGPoint(x: 76, y: y - 42)
+            )
         }
     }
 

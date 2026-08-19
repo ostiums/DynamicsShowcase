@@ -57,8 +57,10 @@ struct WreckingBallDemoViewModel {
         var length: CGFloat { distances.last ?? 0 }
 
         func ballCenter(at index: Int, anchor: CGPoint) -> CGPoint {
-            CGPoint(x: anchor.x + direction.dx * distances[index],
-                    y: anchor.y + direction.dy * distances[index])
+            CGPoint(
+                x: anchor.x + direction.dx * distances[index],
+                y: anchor.y + direction.dy * distances[index]
+            )
         }
     }
 

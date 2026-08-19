@@ -11,8 +11,10 @@ extension Collection where Element: UIView {
     /// The view whose center is closest to `point`, or nil when the closest one
     /// is farther away than `maxDistance`. Every demo that grabs, drags or flicks
     /// an item picks its target this way.
-    func nearest(to point: CGPoint,
-                 within maxDistance: CGFloat = .greatestFiniteMagnitude) -> Element? {
+    func nearest(
+        to point: CGPoint,
+        within maxDistance: CGFloat = .greatestFiniteMagnitude
+    ) -> Element? {
         func distance(to view: Element) -> CGFloat {
             hypot(view.center.x - point.x, view.center.y - point.y)
         }

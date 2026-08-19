@@ -2,8 +2,9 @@ import UIKit
 
 /// Demonstrates UIPushBehavior in both of its modes.
 ///
-/// - `.instantaneous` — a one-shot impulse: flick a puck and the gesture
-///   velocity becomes the push vector; pushing off-center adds spin via
+/// - `.instantaneous` — a one-shot impulse, billiards-style: pull back from
+///   a puck and release, and it shoots in the opposite direction; the farther
+///   the pull, the harder the shot. Grabbing off-center adds spin via
 ///   `setTargetOffsetFromCenter(_:for:)`.
 /// - `.continuous` — a constant force applied every frame; here its angle
 ///   slowly rotates, swirling all the pucks around the table.
@@ -19,9 +20,9 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
     private var continuousPush: UIPushBehavior?
     private var rotationLink: CADisplayLink?
 
-    private let flickLayer = CAShapeLayer()
-    private var flickStart: CGPoint = .zero
-    private weak var flickTarget: BallView?
+    private let aimLayer = CAShapeLayer()
+    private var grabPoint: CGPoint = .zero
+    private weak var aimedPuck: BallView?
 
     private var mode: PushDemoViewModel.Mode {
         PushDemoViewModel.Mode(rawValue: modeControl.selectedSegmentIndex) ?? .impulse
@@ -47,12 +48,12 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
         ])
         showHint(mode.hint)
 
-        // Dashed aiming line shown while flicking.
-        flickLayer.strokeColor = UIColor.white.withAlphaComponent(0.5).cgColor
-        flickLayer.lineWidth = 2
-        flickLayer.lineDashPattern = [4, 6]
-        flickLayer.fillColor = nil
-        view.layer.addSublayer(flickLayer)
+        // Dashed aiming line: finger → puck → projected shot direction.
+        aimLayer.strokeColor = UIColor.white.withAlphaComponent(0.5).cgColor
+        aimLayer.lineWidth = 2
+        aimLayer.lineDashPattern = [4, 6]
+        aimLayer.fillColor = nil
+        view.layer.addSublayer(aimLayer)
 
         view.addGestureRecognizer(UIPanGestureRecognizer(target: self, action: #selector(handlePan)))
     }
@@ -104,7 +105,7 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
         }
     }
 
-    // MARK: - Flick (.instantaneous)
+    // MARK: - Slingshot (.instantaneous)
 
     @objc private func handlePan(_ pan: UIPanGestureRecognizer) {
         guard mode == .impulse else { return }
@@ -112,26 +113,23 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
 
         switch pan.state {
         case .began:
-            flickStart = location
-            flickTarget = pucks.nearest(to: location)
+            grabPoint = location
+            aimedPuck = pucks.nearest(to: location)
 
         case .changed:
-            guard let puck = flickTarget else { return }
-            let path = UIBezierPath()
-            path.move(to: puck.center)
-            path.addLine(to: location)
-            flickLayer.path = path.cgPath
+            guard let puck = aimedPuck else { return }
+            drawAimLine(from: location, through: puck.center)
 
         case .ended:
-            flickLayer.path = nil
-            guard let puck = flickTarget,
-                  let impulse = viewModel.impulseVector(forGestureVelocity: pan.velocity(in: contentView))
+            aimLayer.path = nil
+            guard let puck = aimedPuck,
+                  let impulse = viewModel.impulseVector(pullingFrom: location, puckCenter: puck.center)
             else { return }
 
             let push = UIPushBehavior(items: [puck], mode: .instantaneous)
             push.pushDirection = impulse
             push.setTargetOffsetFromCenter(
-                viewModel.spinOffset(fromTouch: flickStart, puckCenter: puck.center),
+                viewModel.spinOffset(fromGrab: grabPoint, puckCenter: puck.center),
                 for: puck
             )
 
@@ -145,8 +143,28 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
             Haptics.action()
 
         default:
-            flickLayer.path = nil
+            aimLayer.path = nil
         }
+    }
+
+    /// The pull-back segment (finger → puck) continues past the puck to show
+    /// where the shot will go — opposite to the pull, like a billiards cue.
+    private func drawAimLine(from location: CGPoint, through puckCenter: CGPoint) {
+        let path = UIBezierPath()
+        path.move(to: location)
+        path.addLine(to: puckCenter)
+
+        let dx = puckCenter.x - location.x
+        let dy = puckCenter.y - location.y
+        let distance = hypot(dx, dy)
+        if distance > 1 {
+            let length = min(distance, viewModel.maximumAimLength)
+            path.addLine(to: CGPoint(
+                x: puckCenter.x + dx / distance * length,
+                y: puckCenter.y + dy / distance * length
+            ))
+        }
+        aimLayer.path = path.cgPath
     }
 
     // MARK: - Continuous force (.continuous)
@@ -196,17 +214,21 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
 
     // MARK: - UICollisionBehaviorDelegate
 
-    func collisionBehavior(_ behavior: UICollisionBehavior,
-                           beganContactFor item1: UIDynamicItem,
-                           with item2: UIDynamicItem,
-                           at p: CGPoint) {
+    func collisionBehavior(
+        _ behavior: UICollisionBehavior,
+        beganContactFor item1: UIDynamicItem,
+        with item2: UIDynamicItem,
+        at p: CGPoint
+    ) {
         reactToContact(item1, item2, intensity: 0.6)
     }
 
-    func collisionBehavior(_ behavior: UICollisionBehavior,
-                           beganContactFor item: UIDynamicItem,
-                           withBoundaryIdentifier identifier: NSCopying?,
-                           at p: CGPoint) {
+    func collisionBehavior(
+        _ behavior: UICollisionBehavior,
+        beganContactFor item: UIDynamicItem,
+        withBoundaryIdentifier identifier: NSCopying?,
+        at p: CGPoint
+    ) {
         reactToContact(item, intensity: 0.4)
     }
 }

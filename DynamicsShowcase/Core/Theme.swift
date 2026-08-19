@@ -32,10 +32,12 @@ extension UIColor {
     func adjusted(brightnessBy factor: CGFloat) -> UIColor {
         var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
         guard getHue(&h, saturation: &s, brightness: &b, alpha: &a) else { return self }
-        return UIColor(hue: h,
-                       saturation: max(0, min(1, s * (factor < 1 ? 0.9 : 0.75))),
-                       brightness: max(0, min(1, b * factor)),
-                       alpha: a)
+        return UIColor(
+            hue: h,
+            saturation: max(0, min(1, s * (factor < 1 ? 0.9 : 0.75))),
+            brightness: max(0, min(1, b * factor)),
+            alpha: a
+        )
     }
 }
 
@@ -58,10 +60,12 @@ extension CAShapeLayer {
     /// Line that makes a collision boundary visible — a ramp, a platform, a floor.
     /// The boundary itself is added to the collision behavior; this layer is only
     /// its decoration, so the two always have to be created together.
-    static func boundaryLine(from start: CGPoint,
-                             to end: CGPoint,
-                             color: UIColor = UIColor.white.withAlphaComponent(0.35),
-                             glow: UIColor? = Palette.cyan) -> CAShapeLayer {
+    static func boundaryLine(
+        from start: CGPoint,
+        to end: CGPoint,
+        color: UIColor = UIColor.white.withAlphaComponent(0.35),
+        glow: UIColor? = Palette.cyan
+    ) -> CAShapeLayer {
         let path = UIBezierPath()
         path.move(to: start)
         path.addLine(to: end)
@@ -107,7 +111,9 @@ final class HintLabel: UILabel {
 
     override var intrinsicContentSize: CGSize {
         let size = super.intrinsicContentSize
-        return CGSize(width: size.width + insets.left + insets.right,
-                      height: size.height + insets.top + insets.bottom)
+        return CGSize(
+            width: size.width + insets.left + insets.right,
+            height: size.height + insets.top + insets.bottom
+        )
     }
 }

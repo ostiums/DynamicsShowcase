@@ -75,8 +75,10 @@ final class GravityDemoViewController: DemoViewController, UICollisionBehaviorDe
                 self.spawnBall(at: self.viewModel.rainSpawnPoint(in: self.view.bounds))
             }
             pendingSpawns.append(spawn)
-            DispatchQueue.main.asyncAfter(deadline: .now() + Double(index) * viewModel.spawnInterval,
-                                          execute: spawn)
+            DispatchQueue.main.asyncAfter(
+                deadline: .now() + Double(index) * viewModel.spawnInterval,
+                execute: spawn
+            )
         }
     }
 
@@ -86,8 +88,10 @@ final class GravityDemoViewController: DemoViewController, UICollisionBehaviorDe
     }
 
     private func spawnBall(at point: CGPoint) {
-        let ball = BallView(diameter: .random(in: viewModel.ballDiameterRange),
-                            color: Palette.randomNeon())
+        let ball = BallView(
+            diameter: .random(in: viewModel.ballDiameterRange),
+            color: Palette.randomNeon()
+        )
         ball.center = point
         contentView.addSubview(ball)
         balls.append(ball)
@@ -126,24 +130,30 @@ final class GravityDemoViewController: DemoViewController, UICollisionBehaviorDe
 
     @objc private func handlePan(_ pan: UIPanGestureRecognizer) {
         let center = CGPoint(x: view.bounds.midX, y: view.bounds.midY)
-        gravity.gravityDirection = viewModel.gravityDirection(from: center,
-                                                              toward: pan.location(in: view))
+        gravity.gravityDirection = viewModel.gravityDirection(
+            from: center,
+            toward: pan.location(in: view)
+        )
         updateArrow()
     }
 
     // MARK: - UICollisionBehaviorDelegate
 
-    func collisionBehavior(_ behavior: UICollisionBehavior,
-                           beganContactFor item1: UIDynamicItem,
-                           with item2: UIDynamicItem,
-                           at p: CGPoint) {
+    func collisionBehavior(
+        _ behavior: UICollisionBehavior,
+        beganContactFor item1: UIDynamicItem,
+        with item2: UIDynamicItem,
+        at p: CGPoint
+    ) {
         reactToContact(item1, item2, intensity: 0.5)
     }
 
-    func collisionBehavior(_ behavior: UICollisionBehavior,
-                           beganContactFor item: UIDynamicItem,
-                           withBoundaryIdentifier identifier: NSCopying?,
-                           at p: CGPoint) {
+    func collisionBehavior(
+        _ behavior: UICollisionBehavior,
+        beganContactFor item: UIDynamicItem,
+        withBoundaryIdentifier identifier: NSCopying?,
+        at p: CGPoint
+    ) {
         reactToContact(item, intensity: 0.7)
     }
 }

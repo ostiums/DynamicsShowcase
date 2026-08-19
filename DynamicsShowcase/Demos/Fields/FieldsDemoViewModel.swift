@@ -22,8 +22,10 @@ struct FieldsDemoViewModel {
     let minimumFieldY: CGFloat = 120
 
     func particleSpawnPoint(in bounds: CGRect) -> CGPoint {
-        CGPoint(x: .random(in: 20...(bounds.width - 20)),
-                y: .random(in: 140...(bounds.height - 120)))
+        CGPoint(
+            x: .random(in: 20...(bounds.width - 20)),
+            y: .random(in: 140...(bounds.height - 120))
+        )
     }
 
     func initialFieldCenter(in bounds: CGRect) -> CGPoint {

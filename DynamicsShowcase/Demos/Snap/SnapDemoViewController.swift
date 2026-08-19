@@ -59,8 +59,10 @@ final class SnapDemoViewController: DemoViewController {
         snaps.forEach { animator.removeBehavior($0) }
         snaps.removeAll()
 
-        let targets = viewModel.snapTargets(around: tap.location(in: contentView),
-                                            in: view.bounds)
+        let targets = viewModel.snapTargets(
+            around: tap.location(in: contentView),
+            in: view.bounds
+        )
         let damping = viewModel.dampingOptions[dampingControl.selectedSegmentIndex].value
 
         for (tile, target) in zip(tiles, targets) {

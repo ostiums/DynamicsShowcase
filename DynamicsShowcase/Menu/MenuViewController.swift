@@ -63,8 +63,10 @@ final class MenuViewController: UIViewController, UITableViewDataSource, UITable
     }
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = tableView.dequeueReusableCell(withIdentifier: DemoCardCell.reuseIdentifier,
-                                                 for: indexPath) as! DemoCardCell
+        let cell = tableView.dequeueReusableCell(
+            withIdentifier: DemoCardCell.reuseIdentifier,
+            for: indexPath
+        ) as! DemoCardCell
         cell.configure(with: viewModel.demo(at: indexPath.row))
         return cell
     }

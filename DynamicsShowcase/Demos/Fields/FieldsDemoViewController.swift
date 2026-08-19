@@ -50,8 +50,10 @@ final class FieldsDemoViewController: DemoViewController {
         animator.addBehavior(collision)
 
         for _ in 0..<viewModel.particleCount {
-            let particle = BallView(diameter: .random(in: viewModel.particleDiameterRange),
-                                    color: Palette.randomNeon())
+            let particle = BallView(
+                diameter: .random(in: viewModel.particleDiameterRange),
+                color: Palette.randomNeon()
+            )
             particle.center = viewModel.particleSpawnPoint(in: view.bounds)
             contentView.addSubview(particle)
             particles.append(particle)
@@ -137,8 +139,10 @@ final class FieldsDemoViewController: DemoViewController {
 
         if let speed = kind.kickSpeed {
             for particle in particles {
-                particleProperties.addLinearVelocity(viewModel.kickVelocity(speed: speed),
-                                                     for: particle)
+                particleProperties.addLinearVelocity(
+                    viewModel.kickVelocity(speed: speed),
+                    for: particle
+                )
             }
         }
     }

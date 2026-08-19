@@ -65,8 +65,11 @@ final class PlaygroundDemoViewController: DemoViewController, UICollisionBehavio
     /// Slanted ramps: collision boundary lines drawn as glowing layers.
     private func addRamps() {
         for (index, ramp) in viewModel.rampEndpoints(in: view.bounds).enumerated() {
-            collision.addBoundary(withIdentifier: "ramp\(index)" as NSString,
-                                  from: ramp.from, to: ramp.to)
+            collision.addBoundary(
+                withIdentifier: "ramp\(index)" as NSString,
+                from: ramp.from,
+                to: ramp.to
+            )
             contentView.layer.addSublayer(CAShapeLayer.boundaryLine(from: ramp.from, to: ramp.to))
         }
     }
@@ -83,8 +86,10 @@ final class PlaygroundDemoViewController: DemoViewController, UICollisionBehavio
                 self.spawnBall(at: self.viewModel.rainSpawnPoint(in: self.view.bounds))
             }
             pendingSpawns.append(spawn)
-            DispatchQueue.main.asyncAfter(deadline: .now() + Double(index) * viewModel.spawnInterval,
-                                          execute: spawn)
+            DispatchQueue.main.asyncAfter(
+                deadline: .now() + Double(index) * viewModel.spawnInterval,
+                execute: spawn
+            )
         }
     }
 
@@ -94,8 +99,10 @@ final class PlaygroundDemoViewController: DemoViewController, UICollisionBehavio
     }
 
     private func spawnBall(at point: CGPoint) {
-        let ball = BallView(diameter: .random(in: viewModel.ballDiameterRange),
-                            color: Palette.randomNeon())
+        let ball = BallView(
+            diameter: .random(in: viewModel.ballDiameterRange),
+            color: Palette.randomNeon()
+        )
         ball.center = point
         contentView.addSubview(ball)
         items.append(ball)
@@ -182,8 +189,10 @@ final class PlaygroundDemoViewController: DemoViewController, UICollisionBehavio
             if let draggedView {
                 let velocity = pan.velocity(in: contentView)
                 itemProperties.addLinearVelocity(
-                    CGPoint(x: velocity.x * viewModel.throwVelocityFactor,
-                            y: velocity.y * viewModel.throwVelocityFactor),
+                    CGPoint(
+                        x: velocity.x * viewModel.throwVelocityFactor,
+                        y: velocity.y * viewModel.throwVelocityFactor
+                    ),
                     for: draggedView
                 )
                 self.draggedView = nil
@@ -220,10 +229,12 @@ final class PlaygroundDemoViewController: DemoViewController, UICollisionBehavio
 
     // MARK: - UICollisionBehaviorDelegate
 
-    func collisionBehavior(_ behavior: UICollisionBehavior,
-                           beganContactFor item1: UIDynamicItem,
-                           with item2: UIDynamicItem,
-                           at p: CGPoint) {
+    func collisionBehavior(
+        _ behavior: UICollisionBehavior,
+        beganContactFor item1: UIDynamicItem,
+        with item2: UIDynamicItem,
+        at p: CGPoint
+    ) {
         reactToContact(item1, item2, intensity: 0.45)
     }
 }
