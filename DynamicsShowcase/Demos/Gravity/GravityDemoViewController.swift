@@ -157,3 +157,29 @@ final class GravityDemoViewController: DemoViewController, UICollisionBehaviorDe
         reactToContact(item, intensity: 0.7)
     }
 }
+
+// MARK: - Screenshot snippet
+//
+// The physics core of this screen, stripped of layout and styling.
+// This block goes on the code screenshot shown next to the recording.
+/*
+
+let animator = UIDynamicAnimator(referenceView: view)
+
+let gravity = UIGravityBehavior()
+let collision = UICollisionBehavior()
+collision.translatesReferenceBoundsIntoBoundary = true  // screen edges become walls
+animator.addBehavior(gravity)
+animator.addBehavior(collision)
+
+// Every tap drops one more ball into the simulation.
+let ball = BallView(diameter: 44, color: .cyan)
+ball.center = tapLocation
+view.addSubview(ball)
+gravity.addItem(ball)
+collision.addItem(ball)
+
+// Pan steers the gravity vector — the whole world tilts after the finger.
+gravity.gravityDirection = CGVector(dx: cos(angle), dy: sin(angle))
+
+*/

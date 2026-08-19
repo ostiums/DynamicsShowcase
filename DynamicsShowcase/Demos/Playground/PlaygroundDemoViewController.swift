@@ -238,3 +238,32 @@ final class PlaygroundDemoViewController: DemoViewController, UICollisionBehavio
         reactToContact(item1, item2, intensity: 0.45)
     }
 }
+
+// MARK: - Screenshot snippet
+//
+// The physics core of this screen, stripped of layout and styling.
+// This block goes on the code screenshot shown next to the recording.
+/*
+
+// Several behaviors composed in one scene: gravity, walls
+// and slanted ramps drawn as collision boundary lines.
+collision.addBoundary(
+    withIdentifier: "ramp" as NSString,
+    from: rampStart,
+    to: rampEnd
+)
+
+// UIDynamicItemGroup: two views move as a single rigid body.
+// The group is added to the behaviors — not its members.
+let domino = UIDynamicItemGroup(items: [left, right])
+gravity.addItem(domino)
+collision.addItem(domino)
+
+// Drag with an attachment, then throw: on release the gesture
+// velocity is handed straight over to the physics engine.
+itemProperties.addLinearVelocity(
+    pan.velocity(in: view),
+    for: draggedBall
+)
+
+*/

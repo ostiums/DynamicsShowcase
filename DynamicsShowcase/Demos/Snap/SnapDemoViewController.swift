@@ -73,3 +73,22 @@ final class SnapDemoViewController: DemoViewController {
         }
     }
 }
+
+// MARK: - Screenshot snippet
+//
+// The physics core of this screen, stripped of layout and styling.
+// This block goes on the code screenshot shown next to the recording.
+/*
+
+// An item can have only one active snap,
+// so each tap starts by removing the previous ones.
+snaps.forEach { animator.removeBehavior($0) }
+
+// A snap pulls an item to a point with a damped spring.
+for (tile, target) in zip(tiles, targetsAroundFinger) {
+    let snap = UISnapBehavior(item: tile, snapTo: target)
+    snap.damping = 0.5  // 0 — maximum wobble … 1 — dead stop
+    animator.addBehavior(snap)
+}
+
+*/

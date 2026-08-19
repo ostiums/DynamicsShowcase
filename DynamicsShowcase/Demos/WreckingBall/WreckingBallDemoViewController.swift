@@ -222,3 +222,34 @@ final class WreckingBallDemoViewController: DemoViewController, UICollisionBehav
         reactToContact(item1, item2, intensity: 0.5)
     }
 }
+
+// MARK: - Screenshot snippet
+//
+// The physics core of this screen, stripped of layout and styling.
+// This block goes on the code screenshot shown next to the recording.
+/*
+
+// The first ball hangs from a fixed point in space…
+animator.addBehavior(UIAttachmentBehavior(
+    item: balls[0],
+    attachedToAnchor: anchor
+))
+
+// …the rest are linked to each other. Both attachments are rigid:
+// the length locks at the distance between the items at creation time.
+for (ball, previous) in zip(balls.dropFirst(), balls) {
+    animator.addBehavior(UIAttachmentBehavior(
+        item: ball,
+        attachedTo: previous
+    ))
+}
+
+// The last ball is much denser — that's what carries the momentum.
+let wreckingBall = UIDynamicItemBehavior(items: [balls.last!])
+wreckingBall.density = 2.5
+animator.addBehavior(wreckingBall)
+
+// Dragging is one more attachment whose anchor follows the finger.
+dragAttachment.anchorPoint = pan.location(in: view)
+
+*/

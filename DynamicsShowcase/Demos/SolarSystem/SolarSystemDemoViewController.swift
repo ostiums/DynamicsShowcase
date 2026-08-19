@@ -176,3 +176,31 @@ final class SolarSystemDemoViewController: DemoViewController {
         trailPoints[index].removeAll()
     }
 }
+
+// MARK: - Screenshot snippet
+//
+// The physics core of this screen, stripped of layout and styling.
+// This block goes on the code screenshot shown next to the recording.
+/*
+
+// The sun: a radial field with falloff 2 — a true inverse-square
+// law, exactly Newtonian gravity.
+let sun = UIFieldBehavior.radialGravityField(position: center)
+sun.strength = 2.3
+sun.falloff = 2
+planets.forEach { sun.addItem($0) }
+animator.addBehavior(sun)
+
+// Frictionless space: nothing slows the planets down.
+let space = UIDynamicItemBehavior(items: planets)
+space.resistance = 0
+animator.addBehavior(space)
+
+// One tangential kick closes a circular orbit: v = √(GM / r).
+let speed = orbitSpeedFactor / sqrt(orbitRadius)
+space.addLinearVelocity(
+    CGPoint(x: -dy / r * speed, y: dx / r * speed),
+    for: planet
+)
+
+*/

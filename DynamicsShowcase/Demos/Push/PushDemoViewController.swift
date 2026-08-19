@@ -220,3 +220,28 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
         reactToContact(item, intensity: 0.4)
     }
 }
+
+// MARK: - Screenshot snippet
+//
+// The physics core of this screen, stripped of layout and styling.
+// This block goes on the code screenshot shown next to the recording.
+/*
+
+// Billiards-style slingshot: the puck flies opposite to the pull.
+// UIPushBehavior treats the vector's length as the force magnitude.
+let magnitude = min(pullDistance / 30, 8)
+let push = UIPushBehavior(items: [puck], mode: .instantaneous)
+push.pushDirection = CGVector(
+    dx: (puck.center.x - finger.x) / pullDistance * magnitude,
+    dy: (puck.center.y - finger.y) / pullDistance * magnitude
+)
+
+// Grabbing off-center spins the puck — a cue striking off-center.
+push.setTargetOffsetFromCenter(grabOffset, for: puck)
+animator.addBehavior(push)
+
+// The other mode, .continuous, applies the force every frame;
+// slowly rotating its angle swirls all the pucks around the table.
+continuousPush.angle += 0.02
+
+*/
