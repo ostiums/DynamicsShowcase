@@ -11,16 +11,18 @@ struct SolarSystemDemoViewModel {
         let color: UIColor
     }
 
+    // Orbit radii are capped so the whole system fits a phone screen:
+    // the outermost ring stays inside the screen's half-width.
     let planets: [Planet] = [
-        Planet(orbitRadius: 70, diameter: 10, color: Palette.mint),
-        Planet(orbitRadius: 105, diameter: 14, color: Palette.amber),
-        Planet(orbitRadius: 145, diameter: 18, color: Palette.cyan),
-        Planet(orbitRadius: 190, diameter: 12, color: Palette.coral),
-        Planet(orbitRadius: 240, diameter: 16, color: Palette.violet),
-        Planet(orbitRadius: 300, diameter: 9, color: Palette.magenta),
+        Planet(orbitRadius: 52, diameter: 9, color: Palette.mint),
+        Planet(orbitRadius: 78, diameter: 12, color: Palette.amber),
+        Planet(orbitRadius: 104, diameter: 16, color: Palette.cyan),
+        Planet(orbitRadius: 130, diameter: 11, color: Palette.coral),
+        Planet(orbitRadius: 155, diameter: 14, color: Palette.violet),
+        Planet(orbitRadius: 180, diameter: 8, color: Palette.magenta),
     ]
 
-    let sunDiameter: CGFloat = 56
+    let sunDiameter: CGFloat = 48
 
     // The sun's gravity: a radial field with a true inverse-square falloff.
     let sunFieldStrength: CGFloat = 2.3
