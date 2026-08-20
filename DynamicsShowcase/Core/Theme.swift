@@ -86,34 +86,3 @@ extension CAShapeLayer {
         return line
     }
 }
-
-/// Bottom-of-screen hint pill.
-final class HintLabel: UILabel {
-    private let insets = UIEdgeInsets(top: 10, left: 16, bottom: 10, right: 16)
-
-    override init(frame: CGRect) {
-        super.init(frame: frame)
-        font = UIFont.systemFont(ofSize: 13, weight: .semibold).rounded()
-        textColor = UIColor.white.withAlphaComponent(0.85)
-        backgroundColor = UIColor.white.withAlphaComponent(0.08)
-        textAlignment = .center
-        numberOfLines = 0
-        layer.cornerRadius = 14
-        layer.cornerCurve = .continuous
-        layer.masksToBounds = true
-    }
-
-    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
-
-    override func drawText(in rect: CGRect) {
-        super.drawText(in: rect.inset(by: insets))
-    }
-
-    override var intrinsicContentSize: CGSize {
-        let size = super.intrinsicContentSize
-        return CGSize(
-            width: size.width + insets.left + insets.right,
-            height: size.height + insets.top + insets.bottom
-        )
-    }
-}

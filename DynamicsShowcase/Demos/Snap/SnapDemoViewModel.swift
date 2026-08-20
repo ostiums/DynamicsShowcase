@@ -3,8 +3,6 @@ import UIKit
 /// Configuration and target-point math for the snap demo.
 struct SnapDemoViewModel {
 
-    let hint = "Tap anywhere — the tiles fly there.  UISnapBehavior(damping:)"
-
     /// One tile of the word the demo throws around.
     struct Tile {
         let letter: String

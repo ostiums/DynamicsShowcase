@@ -39,7 +39,6 @@ final class WreckingBallDemoViewController: DemoViewController, UICollisionBehav
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        showHint(viewModel.hint)
 
         view.addGestureRecognizer(UIPanGestureRecognizer(target: self, action: #selector(handlePan)))
     }

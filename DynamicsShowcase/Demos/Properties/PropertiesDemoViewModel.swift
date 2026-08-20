@@ -14,20 +14,9 @@ struct PropertiesDemoViewModel {
             case .density: return "Density"
             }
         }
-
-        var hint: String {
-            switch self {
-            case .elasticity:
-                return "elasticity 0.1 → 0.95 — same balls, different bounciness.  Tap to replay"
-            case .density:
-                return "density 0.3 → 2.4 — same impulse, different mass.  Tap to replay"
-            }
-        }
     }
 
     var mode: Mode = .elasticity
-
-    var hint: String { mode.hint }
 
     let ballDiameter: CGFloat = 52
 

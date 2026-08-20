@@ -13,21 +13,6 @@ enum FieldKind: String, CaseIterable {
     case electric = "Electric"
     case magnetic = "Magnetic"
 
-    var hint: String {
-        switch self {
-        case .radial: return ".radialGravityField — particles are pulled toward the finger"
-        case .spring: return ".springField — a spring toward the field center, the swarm pulses"
-        case .vortex: return ".vortexField — swirls particles around the finger"
-        case .noise: return ".noiseField — random force, Brownian motion"
-        case .turbulence: return ".turbulenceField — scatters the swarm boiling around a soft spring"
-        case .velocity: return ".velocityField — an upward jet + gravity = fountain"
-        case .linear: return ".linearGravityField — linear gravity across the field region"
-        case .drag: return ".dragField — a viscosity zone: particles get stuck inside the circle"
-        case .electric: return ".electricField — charged particles (charge) are attracted"
-        case .magnetic: return ".magneticField — force ⊥ velocity, trajectories curl"
-        }
-    }
-
     /// Some kinds only reveal their effect on moving particles;
     /// they get a random velocity kick of this speed on selection.
     var kickSpeed: CGFloat? {

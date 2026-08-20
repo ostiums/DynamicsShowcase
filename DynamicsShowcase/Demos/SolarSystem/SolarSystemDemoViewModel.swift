@@ -3,8 +3,6 @@ import UIKit
 /// Configuration and orbital math for the solar-system scene.
 struct SolarSystemDemoViewModel {
 
-    let hint = "A model solar system: planets coast on a true 1/r² gravity field"
-
     struct Planet {
         let orbitRadius: CGFloat
         let diameter: CGFloat

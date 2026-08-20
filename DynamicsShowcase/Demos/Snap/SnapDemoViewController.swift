@@ -18,7 +18,6 @@ final class SnapDemoViewController: DemoViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        showHint(viewModel.hint)
 
         for (index, option) in viewModel.dampingOptions.enumerated() {
             dampingControl.insertSegment(withTitle: option.title, at: index, animated: false)

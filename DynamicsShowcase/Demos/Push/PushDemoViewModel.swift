@@ -14,15 +14,6 @@ struct PushDemoViewModel {
             case .continuous: return "Continuous force"
             }
         }
-
-        var hint: String {
-            switch self {
-            case .impulse:
-                return "Pull back from a puck and release — it shoots the other way, billiards-style"
-            case .continuous:
-                return "UIPushBehavior(.continuous) — constant force with a slowly rotating vector"
-            }
-        }
     }
 
     let puckCount = 5

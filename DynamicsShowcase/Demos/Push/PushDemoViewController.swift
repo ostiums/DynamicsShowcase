@@ -46,7 +46,6 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
             modeControl.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             modeControl.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 12),
         ])
-        showHint(mode.hint)
 
         // Dashed pull-back line: finger → puck.
         aimLayer.strokeColor = UIColor.white.withAlphaComponent(0.5).cgColor
@@ -158,7 +157,6 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
     // MARK: - Continuous force (.continuous)
 
     @objc private func modeChanged() {
-        showHint(mode.hint)
         if mode == .continuous {
             startContinuousPush()
         } else {

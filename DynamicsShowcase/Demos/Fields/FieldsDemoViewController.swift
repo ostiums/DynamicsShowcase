@@ -125,7 +125,6 @@ final class FieldsDemoViewController: DemoViewController {
 
     private func apply(kind: FieldKind) {
         viewModel.selectedKind = kind
-        showHint(viewModel.hint)
         highlightSelectedChip()
 
         activeFields.forEach { animator.removeBehavior($0) }

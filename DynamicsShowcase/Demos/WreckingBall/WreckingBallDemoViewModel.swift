@@ -5,8 +5,6 @@ import UIKit
 /// UIKit Dynamics code.
 struct WreckingBallDemoViewModel {
 
-    let hint = "Drag the ball and smash the tower.  Anchor + item-to-item rigid links"
-
     /// One link of the chain.
     struct ChainBall {
         let diameter: CGFloat

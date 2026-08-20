@@ -25,7 +25,6 @@ final class GravityDemoViewController: DemoViewController, UICollisionBehaviorDe
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        showHint(viewModel.hint)
 
         arrow.tintColor = UIColor.white.withAlphaComponent(0.35)
         arrow.translatesAutoresizingMaskIntoConstraints = false

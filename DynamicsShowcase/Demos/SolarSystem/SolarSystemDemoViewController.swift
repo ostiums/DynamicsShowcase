@@ -26,11 +26,6 @@ final class SolarSystemDemoViewController: DemoViewController {
 
     // MARK: - Lifecycle
 
-    override func viewDidLoad() {
-        super.viewDidLoad()
-        showHint(viewModel.hint)
-    }
-
     // The link that draws trails and rescues lost planets runs only while the
     // screen is visible: a CADisplayLink retains its target.
     override func viewWillAppear(_ animated: Bool) {

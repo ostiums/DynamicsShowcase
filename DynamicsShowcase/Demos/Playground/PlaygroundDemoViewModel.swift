@@ -4,8 +4,6 @@ import CoreGraphics
 /// Configuration and layout math for the playground scene.
 struct PlaygroundDemoViewModel {
 
-    let hint = "Tap — ball · long-press — domino group · drag & throw · two-finger tap — magnet"
-
     let initialBallCount = 6
     let spawnInterval: TimeInterval = 0.12
     let maxItemCount = 34

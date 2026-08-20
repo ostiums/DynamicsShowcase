@@ -6,8 +6,6 @@ import CoreGraphics
 /// from here and feeds them into UIKit Dynamics.
 struct GravityDemoViewModel {
 
-    let hint = "Tap to drop balls.  Drag to steer the gravity vector"
-
     // Scene tuning.
     let initialBallCount = 10
     let spawnInterval: TimeInterval = 0.09

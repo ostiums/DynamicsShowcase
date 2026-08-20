@@ -27,7 +27,6 @@ final class PlaygroundDemoViewController: DemoViewController, UICollisionBehavio
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        showHint(viewModel.hint)
 
         view.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(handleTap)))
         view.addGestureRecognizer(UILongPressGestureRecognizer(target: self, action: #selector(handleLongPress)))

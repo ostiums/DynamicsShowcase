@@ -49,7 +49,6 @@ final class PropertiesDemoViewController: DemoViewController {
     }
 
     override func buildScene() {
-        showHint(viewModel.hint)
         switch viewModel.mode {
         case .elasticity: buildElasticityScene()
         case .density: buildDensityScene()
@@ -68,7 +67,7 @@ final class PropertiesDemoViewController: DemoViewController {
         animator.addBehavior(gravity)
         animator.addBehavior(collision)
 
-        // A visible "floor" above the captions and the hint.
+        // A visible "floor" above the captions.
         let floorY = view.bounds.height - viewModel.floorInset
         collision.addBoundary(
             withIdentifier: "floor" as NSString,

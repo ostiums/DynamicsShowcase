@@ -6,8 +6,6 @@ struct FieldsDemoViewModel {
     /// Currently selected field type.
     var selectedKind: FieldKind = .radial
 
-    var hint: String { selectedKind.hint }
-
     let allKinds = FieldKind.allCases
 
     // Particle swarm tuning.
