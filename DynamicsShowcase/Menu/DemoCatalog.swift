@@ -70,5 +70,12 @@ enum DemoCatalog {
             apiSummary: "Everything + UIDynamicItemGroup",
             makeViewController: { PlaygroundDemoViewController() }
         ),
+        DemoDescriptor(
+            emoji: "🎉",
+            accentColor: Palette.amber,
+            title: "Paywall Drop",
+            apiSummary: "Real UI views as dynamic items",
+            makeViewController: { PaywallDemoViewController() }
+        ),
     ]
 }
