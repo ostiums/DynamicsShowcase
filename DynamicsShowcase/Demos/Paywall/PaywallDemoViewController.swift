@@ -316,7 +316,9 @@ final class PaywallDemoViewController: DemoViewController {
         label.layer.shadowRadius = 6
         label.layer.shadowOffset = .zero
         label.center = CGPoint(x: view.bounds.midX, y: -60)
+        label.alpha = 0
         contentView.addSubview(label)
+        UIView.animate(withDuration: viewModel.greetingFadeInDuration) { label.alpha = 1 }
 
         // The greeting starts above the screen and drops onto a damped
         // spring — no gravity on it, the snap alone does the work.
@@ -340,6 +342,10 @@ final class PaywallDemoViewController: DemoViewController {
         emitter.emitterSize = CGSize(width: view.bounds.width, height: 1)
         emitter.emitterShape = .line
         emitter.emitterCells = Palette.neon.map { makeConfettiCell(color: $0) }
+        // Without an explicit beginTime the emitter backdates its timeline
+        // and instantly fills the screen with mid-air confetti; with it the
+        // pieces genuinely start falling from the top edge.
+        emitter.beginTime = CACurrentMediaTime()
         contentView.layer.addSublayer(emitter)
 
         schedule(after: viewModel.confettiDuration) { _ in
