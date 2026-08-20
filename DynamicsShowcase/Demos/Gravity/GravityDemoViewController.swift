@@ -18,6 +18,12 @@ final class GravityDemoViewController: DemoViewController, UICollisionBehaviorDe
     private var balls: [BallView] = []
     private var pendingSpawns: [DispatchWorkItem] = []
 
+    /// Unit direction of gravity, kept separately from the behavior:
+    /// `gravityDirection` and `magnitude` are one and the same vector
+    /// (its length is the strength), so assigning a unit direction would
+    /// silently reset the slider's magnitude back to 1.
+    private var gravityUnitDirection = CGVector(dx: 0, dy: 1)
+
     private let arrow = UIImageView(image: UIImage(
         systemName: "location.north.fill",
         withConfiguration: UIImage.SymbolConfiguration(pointSize: 30, weight: .bold)
@@ -63,7 +69,8 @@ final class GravityDemoViewController: DemoViewController, UICollisionBehaviorDe
         cancelPendingSpawns()
 
         gravity = UIGravityBehavior()
-        gravity.magnitude = CGFloat(magnitudeSlider.value)
+        gravityUnitDirection = CGVector(dx: 0, dy: 1)
+        applyGravityVector()
 
         collision = UICollisionBehavior()
         collision.translatesReferenceBoundsIntoBoundary = true
@@ -135,9 +142,18 @@ final class GravityDemoViewController: DemoViewController, UICollisionBehaviorDe
         }
     }
 
+    /// The single writer of the behavior's vector: direction × slider value.
+    private func applyGravityVector() {
+        let magnitude = CGFloat(magnitudeSlider.value)
+        gravity.gravityDirection = CGVector(
+            dx: gravityUnitDirection.dx * magnitude,
+            dy: gravityUnitDirection.dy * magnitude
+        )
+    }
+
     private func updateArrow() {
         arrow.transform = CGAffineTransform(
-            rotationAngle: viewModel.arrowRotation(for: gravity.gravityDirection)
+            rotationAngle: viewModel.arrowRotation(for: gravityUnitDirection)
         )
     }
 
@@ -149,7 +165,7 @@ final class GravityDemoViewController: DemoViewController, UICollisionBehaviorDe
     }
 
     @objc private func magnitudeChanged() {
-        gravity.magnitude = CGFloat(magnitudeSlider.value)
+        applyGravityVector()
         if magnitudeSlider.value == 0 {
             freezeBalls()
         }
@@ -174,10 +190,11 @@ final class GravityDemoViewController: DemoViewController, UICollisionBehaviorDe
 
     @objc private func handlePan(_ pan: UIPanGestureRecognizer) {
         let center = CGPoint(x: view.bounds.midX, y: view.bounds.midY)
-        gravity.gravityDirection = viewModel.gravityDirection(
+        gravityUnitDirection = viewModel.gravityDirection(
             from: center,
             toward: pan.location(in: view)
         )
+        applyGravityVector()
         updateArrow()
     }
 
@@ -220,11 +237,13 @@ animator.addBehavior(collision)
 gravity.addItem(ball)
 collision.addItem(ball)
 
-// Pan steers the gravity vector — the whole world tilts after the finger.
-gravity.gravityDirection = CGVector(dx: cos(angle), dy: sin(angle))
-
-// The slider scales the pull; 1 is UIKit's default strength.
-gravity.magnitude = CGFloat(slider.value)
+// Pan steers the vector, the slider scales it. Direction and strength
+// are one CGVector: its length IS the magnitude (1 is UIKit's default),
+// so assigning a unit direction would reset the strength back to 1.
+gravity.gravityDirection = CGVector(
+    dx: cos(angle) * magnitude,
+    dy: sin(angle) * magnitude
+)
 
 // At zero gravity the balls freeze mid-air: cancel their velocity
 // (there is no setter — add the inverse of the current value).
