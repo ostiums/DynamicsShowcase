@@ -48,7 +48,7 @@ struct PaywallDemoViewModel {
     let note = "✓ No Payment Due Now"
     let buttonTitle = "Start My 3-Day Free Trial"
     let footnote = "3 days free, then $29.99 per year ($2.49/mo)"
-    let congratulations = "Congratulations"
+    let greeting = "You're all set"
 
     // The collapse: how the paywall elements behave once they become
     // dynamic items. There is no collision behavior on purpose — the
@@ -63,11 +63,11 @@ struct PaywallDemoViewModel {
 
     /// Pause between the collapse and the celebration.
     let celebrationDelay: TimeInterval = 1.1
-    /// Damping of the snap that drops the congratulations in.
-    let congratulationsSnapDamping: CGFloat = 0.65
+    /// Damping of the snap that drops the greeting in.
+    let greetingSnapDamping: CGFloat = 0.65
     /// Resistance on the greeting: a snap has no speed setting, so this
     /// is what makes the flight a slow drift instead of a slam.
-    let congratulationsResistance: CGFloat = 2.5
+    let greetingResistance: CGFloat = 2.5
     /// How long the confetti cannon fires.
     let confettiDuration: TimeInterval = 2.5
 }

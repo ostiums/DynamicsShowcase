@@ -4,7 +4,7 @@ import UIKit
 /// where every element is a plain UIView — until "Continue" hands them
 /// all over to UIKit Dynamics. The whole interface tumbles off the
 /// bottom of the screen, confetti rains from a CAEmitterLayer, and the
-/// congratulations drops in on a UISnapBehavior.
+/// "You're all set" greeting drops in on a UISnapBehavior.
 final class PaywallDemoViewController: DemoViewController {
 
     private let viewModel = PaywallDemoViewModel()
@@ -306,14 +306,14 @@ final class PaywallDemoViewController: DemoViewController {
         Haptics.action()
 
         let label = makeLabel(
-            viewModel.congratulations,
+            viewModel.greeting,
             font: UIFont.systemFont(ofSize: 34, weight: .heavy).rounded(),
             color: .white
         )
         label.sizeToFit()
         label.layer.shadowColor = Palette.amber.cgColor
-        label.layer.shadowOpacity = 0.8
-        label.layer.shadowRadius = 12
+        label.layer.shadowOpacity = 0.4
+        label.layer.shadowRadius = 6
         label.layer.shadowOffset = .zero
         label.center = CGPoint(x: view.bounds.midX, y: -60)
         contentView.addSubview(label)
@@ -324,13 +324,13 @@ final class PaywallDemoViewController: DemoViewController {
             item: label,
             snapTo: CGPoint(x: view.bounds.midX, y: view.bounds.midY - 140)
         )
-        snap.damping = viewModel.congratulationsSnapDamping
+        snap.damping = viewModel.greetingSnapDamping
         animator.addBehavior(snap)
 
         // A snap has no speed knob; resistance on the item is what turns
         // the arrival from a slam into a slow drift.
         let drift = UIDynamicItemBehavior(items: [label])
-        drift.resistance = viewModel.congratulationsResistance
+        drift.resistance = viewModel.greetingResistance
         animator.addBehavior(drift)
     }
 
@@ -404,9 +404,9 @@ for element in paywallElements {
 
 // The greeting drifts in on a damped spring — a snap slowed
 // down by resistance — while confetti falls.
-let snap = UISnapBehavior(item: congratulations, snapTo: center)
+let snap = UISnapBehavior(item: greeting, snapTo: center)
 snap.damping = 0.65
-let drift = UIDynamicItemBehavior(items: [congratulations])
+let drift = UIDynamicItemBehavior(items: [greeting])
 drift.resistance = 2.5
 animator.addBehavior(snap)
 animator.addBehavior(drift)
