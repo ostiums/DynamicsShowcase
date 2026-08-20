@@ -15,6 +15,13 @@ final class PaywallDemoViewController: DemoViewController {
     /// Kept as work items so a reset can cancel a celebration still pending.
     private var pendingWork: [DispatchWorkItem] = []
 
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        // A real paywall has no navigation title hanging over it.
+        navigationItem.largeTitleDisplayMode = .never
+        title = nil
+    }
+
     override func buildScene() {
         elements.removeAll()
         collapsed = false
@@ -264,13 +271,14 @@ final class PaywallDemoViewController: DemoViewController {
 
         let gravity = UIGravityBehavior(items: elements)
         let bodies = UIDynamicItemBehavior(items: elements)
+        // The elements fall upright — no torque, no tumbling.
+        bodies.allowsRotation = false
         animator.addBehavior(gravity)
         animator.addBehavior(bodies)
 
-        // Scatter: a small upward pop with sideways drift and spin, so the
-        // layout bursts apart as it falls out of view.
+        // Scatter: a small upward pop with sideways drift, so the layout
+        // bursts apart as it falls out of view.
         for element in elements {
-            bodies.addAngularVelocity(.random(in: viewModel.spinRange), for: element)
             bodies.addLinearVelocity(
                 CGPoint(
                     x: .random(in: viewModel.kickRangeX),
@@ -318,6 +326,12 @@ final class PaywallDemoViewController: DemoViewController {
         )
         snap.damping = viewModel.congratulationsSnapDamping
         animator.addBehavior(snap)
+
+        // A snap has no speed knob; resistance on the item is what turns
+        // the arrival from a slam into a slow drift.
+        let drift = UIDynamicItemBehavior(items: [label])
+        drift.resistance = viewModel.congratulationsResistance
+        animator.addBehavior(drift)
     }
 
     private func startConfetti() {
@@ -383,14 +397,17 @@ let bodies = UIDynamicItemBehavior(items: paywallElements)
 animator.addBehavior(gravity)
 animator.addBehavior(bodies)
 
-// A pop of spin and scatter, so the layout bursts apart as it falls.
+// A pop of scatter, so the layout bursts apart as it falls.
 for element in paywallElements {
-    bodies.addAngularVelocity(.random(in: -6...6), for: element)
     bodies.addLinearVelocity(scatterKick(), for: element)
 }
 
-// The greeting drops in on a damped spring while confetti falls.
+// The greeting drifts in on a damped spring — a snap slowed
+// down by resistance — while confetti falls.
 let snap = UISnapBehavior(item: congratulations, snapTo: center)
 snap.damping = 0.65
+let drift = UIDynamicItemBehavior(items: [congratulations])
+drift.resistance = 2.5
 animator.addBehavior(snap)
+animator.addBehavior(drift)
 */

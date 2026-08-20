@@ -53,9 +53,7 @@ struct PaywallDemoViewModel {
     // The collapse: how the paywall elements behave once they become
     // dynamic items. There is no collision behavior on purpose — the
     // elements fall straight through the bottom edge and off the screen.
-    /// Random spin handed to every falling element, rad/s.
-    let spinRange: ClosedRange<CGFloat> = -6...6
-    /// Sideways scatter so the elements tumble apart as they fall.
+    /// Sideways scatter so the elements drift apart as they fall.
     let kickRangeX: ClosedRange<CGFloat> = -160...160
     /// A small upward pop before the fall — the layout bursts apart.
     let kickRangeY: ClosedRange<CGFloat> = -220...(-60)
@@ -67,6 +65,9 @@ struct PaywallDemoViewModel {
     let celebrationDelay: TimeInterval = 1.1
     /// Damping of the snap that drops the congratulations in.
     let congratulationsSnapDamping: CGFloat = 0.65
+    /// Resistance on the greeting: a snap has no speed setting, so this
+    /// is what makes the flight a slow drift instead of a slam.
+    let congratulationsResistance: CGFloat = 2.5
     /// How long the confetti cannon fires.
     let confettiDuration: TimeInterval = 2.5
 }
