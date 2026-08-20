@@ -20,7 +20,7 @@ Jumping straight to a screen for recording: set the `AUTO_OPEN_DEMO` environment
 | 🪐 Solar System | `radialGravityField(falloff: 2)` — a true inverse-square gravity well; planets on calibrated circular orbits (`linearVelocity(for:)`, `updateItem(usingCurrentState:)`) |
 | ⚖️ Body Properties | `UIDynamicItemBehavior` — `elasticity`, `density`, `resistance` compared side by side, a floor boundary via `addBoundary(withIdentifier:from:to:)` |
 | 🎪 Playground | everything at once + `UIDynamicItemGroup` (domino pairs on long-press), ramp boundaries, a two-finger magnet, `addLinearVelocity` for throwing |
-| 🎉 Paywall Drop | any `UIView` is a dynamic item: a realistic paywall collapses under gravity on "Continue", `addAngularVelocity` spin, a `UISnapBehavior` congratulations drop, `CAEmitterLayer` confetti |
+| 🎉 Paywall Drop | any `UIView` is a dynamic item: a realistic paywall tumbles off the screen under gravity on "Continue", `addAngularVelocity` spin, a `UISnapBehavior` congratulations drop, `CAEmitterLayer` confetti |
 
 ## Architecture
 
@@ -69,7 +69,7 @@ DynamicsShowcase/
 7. **Solar System** (8 s) — an orrery running on real inverse-square gravity: planets glide along their rings, trails curving behind.
 8. **Body Properties** (4 s) — tap a couple of times: the elasticity difference is instantly visible.
 9. **Playground** (8 s) — pour balls onto the ramps, hold a long-press (domino group), two-finger tap: everything flies into the "magnet" and scatters.
-10. **Paywall Drop** (6 s) — the finale: tap "Start My 3-Day Free Trial" and the whole paywall collapses into a pile, confetti falls, "Congratulations" bounces in.
+10. **Paywall Drop** (6 s) — the finale: tap "Start My 3-Day Free Trial" and the whole paywall tumbles off the screen, confetti falls, "Congratulations" bounces in.
 
 Tip: the simulator has no haptics; for a recording with sound, use a physical device + QuickTime.
 

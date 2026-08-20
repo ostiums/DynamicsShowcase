@@ -2,8 +2,8 @@ import UIKit
 
 /// The trick shot of the showcase: a perfectly ordinary paywall screen
 /// where every element is a plain UIView — until "Continue" hands them
-/// all over to UIKit Dynamics. Gravity and collisions pile the interface
-/// at the bottom, confetti rains from a CAEmitterLayer, and the
+/// all over to UIKit Dynamics. The whole interface tumbles off the
+/// bottom of the screen, confetti rains from a CAEmitterLayer, and the
 /// congratulations drops in on a UISnapBehavior.
 final class PaywallDemoViewController: DemoViewController {
 
@@ -82,9 +82,8 @@ final class PaywallDemoViewController: DemoViewController {
     }
 
     /// Three timeline entries plus the vertical line connecting their icons.
-    /// Icon and text block are separate elements on purpose: small circles
-    /// and narrow slabs tumble into a much livelier pile than full-width
-    /// row containers, which would just re-stack neatly.
+    /// Icon and text block are separate elements on purpose: many small
+    /// pieces burst apart far livelier than full-width row containers.
     /// Returns the bottom edge of the timeline.
     private func layoutTimeline(startY: CGFloat, margin: CGFloat, width: CGFloat) -> CGFloat {
         let rowHeight: CGFloat = 74
@@ -104,7 +103,10 @@ final class PaywallDemoViewController: DemoViewController {
         for (index, timelineStep) in viewModel.steps.enumerated() {
             let rowY = startY + CGFloat(index) * step
 
-            let icon = EllipseItemView(image: UIImage(systemName: timelineStep.iconName))
+            let icon = UIImageView(image: UIImage(systemName: timelineStep.iconName))
+            icon.preferredSymbolConfiguration = UIImage.SymbolConfiguration(pointSize: 15, weight: .bold)
+            icon.tintColor = .black
+            icon.contentMode = .center
             icon.backgroundColor = timelineStep.iconBackground
             icon.frame = CGRect(x: margin, y: rowY, width: 36, height: 36)
             icon.layer.cornerRadius = 18
@@ -253,27 +255,20 @@ final class PaywallDemoViewController: DemoViewController {
     // MARK: - The collapse
 
     /// The moment of the trick: the same views that made up the paywall
-    /// become dynamic items and drop into a pile at the bottom.
+    /// become dynamic items. With no collision boundary in their way they
+    /// tumble straight off the bottom of the screen.
     @objc private func continueTapped() {
         guard !collapsed else { return }
         collapsed = true
         Haptics.action()
 
         let gravity = UIGravityBehavior(items: elements)
-
-        let collision = UICollisionBehavior(items: elements)
-        collision.translatesReferenceBoundsIntoBoundary = true
-
         let bodies = UIDynamicItemBehavior(items: elements)
-        bodies.elasticity = viewModel.elementElasticity
-        bodies.friction = viewModel.elementFriction
-
         animator.addBehavior(gravity)
-        animator.addBehavior(collision)
         animator.addBehavior(bodies)
 
         // Scatter: a small upward pop with sideways drift and spin, so the
-        // layout bursts apart and tumbles into a pile instead of re-stacking.
+        // layout bursts apart as it falls out of view.
         for element in elements {
             bodies.addAngularVelocity(.random(in: viewModel.spinRange), for: element)
             bodies.addLinearVelocity(
@@ -286,6 +281,14 @@ final class PaywallDemoViewController: DemoViewController {
         }
 
         schedule(after: viewModel.celebrationDelay) { $0.celebrate() }
+
+        // Once everything has left the screen, stop simulating it.
+        schedule(after: viewModel.cleanupDelay) {
+            $0.animator.removeBehavior(gravity)
+            $0.animator.removeBehavior(bodies)
+            $0.elements.forEach { $0.removeFromSuperview() }
+            $0.elements.removeAll()
+        }
     }
 
     // MARK: - Celebration
@@ -356,25 +359,6 @@ final class PaywallDemoViewController: DemoViewController {
         }
     }
 
-    /// A circular icon that also collides as a circle, so it rolls
-    /// around the pile instead of resting on invisible square corners.
-    private final class EllipseItemView: UIView {
-        override var collisionBoundsType: UIDynamicItemCollisionBoundsType { .ellipse }
-
-        init(image: UIImage?) {
-            super.init(frame: .zero)
-            let icon = UIImageView(image: image)
-            icon.preferredSymbolConfiguration = UIImage.SymbolConfiguration(pointSize: 15, weight: .bold)
-            icon.tintColor = .black
-            icon.contentMode = .center
-            icon.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-            icon.frame = bounds
-            addSubview(icon)
-        }
-
-        required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
-    }
-
     private func schedule(after delay: TimeInterval, _ work: @escaping (PaywallDemoViewController) -> Void) {
         let item = DispatchWorkItem { [weak self] in
             guard let self else { return }
@@ -392,15 +376,17 @@ final class PaywallDemoViewController: DemoViewController {
 /*
 
 // Any UIView already is a UIDynamicItem — even a live paywall.
-// One tap hands the whole layout over to the physics engine.
+// One tap hands the whole layout over to the physics engine,
+// and gravity carries it right off the screen.
 let gravity = UIGravityBehavior(items: paywallElements)
-let collision = UICollisionBehavior(items: paywallElements)
-collision.translatesReferenceBoundsIntoBoundary = true
-
 let bodies = UIDynamicItemBehavior(items: paywallElements)
-bodies.elasticity = 0.45
+animator.addBehavior(gravity)
+animator.addBehavior(bodies)
+
+// A pop of spin and scatter, so the layout bursts apart as it falls.
 for element in paywallElements {
-    bodies.addAngularVelocity(.random(in: -3.5...3.5), for: element)
+    bodies.addAngularVelocity(.random(in: -6...6), for: element)
+    bodies.addLinearVelocity(scatterKick(), for: element)
 }
 
 // The greeting drops in on a damped spring while confetti falls.

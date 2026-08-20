@@ -51,16 +51,17 @@ struct PaywallDemoViewModel {
     let congratulations = "Congratulations"
 
     // The collapse: how the paywall elements behave once they become
-    // dynamic items.
-    let elementElasticity: CGFloat = 0.45
-    let elementFriction: CGFloat = 0.4
+    // dynamic items. There is no collision behavior on purpose — the
+    // elements fall straight through the bottom edge and off the screen.
     /// Random spin handed to every falling element, rad/s.
     let spinRange: ClosedRange<CGFloat> = -6...6
-    /// Sideways scatter so the elements tumble instead of re-stacking
-    /// in their original order.
+    /// Sideways scatter so the elements tumble apart as they fall.
     let kickRangeX: ClosedRange<CGFloat> = -160...160
     /// A small upward pop before the fall — the layout bursts apart.
     let kickRangeY: ClosedRange<CGFloat> = -220...(-60)
+    /// By this time everything has left the screen and the simulation
+    /// of the fallen elements can be torn down.
+    let cleanupDelay: TimeInterval = 4
 
     /// Pause between the collapse and the celebration.
     let celebrationDelay: TimeInterval = 1.1
