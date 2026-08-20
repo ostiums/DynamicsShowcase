@@ -4,7 +4,8 @@ import UIKit
 ///
 /// - Tap drops a ball.
 /// - Pan steers `UIGravityBehavior.gravityDirection` (the arrow shows the vector).
-/// - The slider scales `UIGravityBehavior.magnitude` — moon-light to crushing.
+/// - The slider scales `UIGravityBehavior.magnitude` — down to zero, where the
+///   balls also get their velocity cancelled and freeze mid-air.
 /// - `translatesReferenceBoundsIntoBoundary` turns the screen edges into walls.
 /// - `UICollisionBehaviorDelegate` reacts to contacts with flashes and haptics.
 final class GravityDemoViewController: DemoViewController, UICollisionBehaviorDelegate {
@@ -42,7 +43,7 @@ final class GravityDemoViewController: DemoViewController, UICollisionBehaviorDe
         magnitudeSlider.value = Float(viewModel.defaultGravityMagnitude)
         magnitudeSlider.minimumTrackTintColor = Palette.cyan
         magnitudeSlider.tintColor = UIColor.white.withAlphaComponent(0.7)
-        magnitudeSlider.minimumValueImage = UIImage(systemName: "moon")
+        magnitudeSlider.minimumValueImage = UIImage(systemName: "snowflake")
         magnitudeSlider.maximumValueImage = UIImage(systemName: "globe.americas.fill")
         magnitudeSlider.addTarget(self, action: #selector(magnitudeChanged), for: .valueChanged)
         magnitudeSlider.translatesAutoresizingMaskIntoConstraints = false
@@ -149,6 +150,26 @@ final class GravityDemoViewController: DemoViewController, UICollisionBehaviorDe
 
     @objc private func magnitudeChanged() {
         gravity.magnitude = CGFloat(magnitudeSlider.value)
+        if magnitudeSlider.value == 0 {
+            freezeBalls()
+        }
+    }
+
+    /// Zero gravity turns the scene into stopped time: every ball's velocity
+    /// is cancelled out, so they hang exactly where the slider caught them.
+    /// There is no velocity setter — the inverse is added instead.
+    private func freezeBalls() {
+        for ball in balls {
+            let velocity = ballProperties.linearVelocity(for: ball)
+            ballProperties.addLinearVelocity(
+                CGPoint(x: -velocity.x, y: -velocity.y),
+                for: ball
+            )
+            ballProperties.addAngularVelocity(
+                -ballProperties.angularVelocity(for: ball),
+                for: ball
+            )
+        }
     }
 
     @objc private func handlePan(_ pan: UIPanGestureRecognizer) {
@@ -204,4 +225,12 @@ gravity.gravityDirection = CGVector(dx: cos(angle), dy: sin(angle))
 
 // The slider scales the pull; 1 is UIKit's default strength.
 gravity.magnitude = CGFloat(slider.value)
+
+// At zero gravity the balls freeze mid-air: cancel their velocity
+// (there is no setter — add the inverse of the current value).
+let velocity = ballProperties.linearVelocity(for: ball)
+ballProperties.addLinearVelocity(
+    CGPoint(x: -velocity.x, y: -velocity.y),
+    for: ball
+)
 */
