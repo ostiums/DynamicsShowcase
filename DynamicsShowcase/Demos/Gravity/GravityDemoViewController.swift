@@ -4,6 +4,7 @@ import UIKit
 ///
 /// - Tap drops a ball.
 /// - Pan steers `UIGravityBehavior.gravityDirection` (the arrow shows the vector).
+/// - The slider scales `UIGravityBehavior.magnitude` — moon-light to crushing.
 /// - `translatesReferenceBoundsIntoBoundary` turns the screen edges into walls.
 /// - `UICollisionBehaviorDelegate` reacts to contacts with flashes and haptics.
 final class GravityDemoViewController: DemoViewController, UICollisionBehaviorDelegate {
@@ -21,6 +22,8 @@ final class GravityDemoViewController: DemoViewController, UICollisionBehaviorDe
         withConfiguration: UIImage.SymbolConfiguration(pointSize: 30, weight: .bold)
     ))
 
+    private let magnitudeSlider = UISlider()
+
     // MARK: - Lifecycle
 
     override func viewDidLoad() {
@@ -34,6 +37,22 @@ final class GravityDemoViewController: DemoViewController, UICollisionBehaviorDe
             arrow.centerYAnchor.constraint(equalTo: view.centerYAnchor),
         ])
 
+        magnitudeSlider.minimumValue = Float(viewModel.gravityMagnitudeRange.lowerBound)
+        magnitudeSlider.maximumValue = Float(viewModel.gravityMagnitudeRange.upperBound)
+        magnitudeSlider.value = Float(viewModel.defaultGravityMagnitude)
+        magnitudeSlider.minimumTrackTintColor = Palette.cyan
+        magnitudeSlider.tintColor = UIColor.white.withAlphaComponent(0.7)
+        magnitudeSlider.minimumValueImage = UIImage(systemName: "moon")
+        magnitudeSlider.maximumValueImage = UIImage(systemName: "globe.americas.fill")
+        magnitudeSlider.addTarget(self, action: #selector(magnitudeChanged), for: .valueChanged)
+        magnitudeSlider.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(magnitudeSlider)
+        NSLayoutConstraint.activate([
+            magnitudeSlider.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 12),
+            magnitudeSlider.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 60),
+            magnitudeSlider.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -60),
+        ])
+
         view.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(handleTap)))
         view.addGestureRecognizer(UIPanGestureRecognizer(target: self, action: #selector(handlePan)))
     }
@@ -43,6 +62,7 @@ final class GravityDemoViewController: DemoViewController, UICollisionBehaviorDe
         cancelPendingSpawns()
 
         gravity = UIGravityBehavior()
+        gravity.magnitude = CGFloat(magnitudeSlider.value)
 
         collision = UICollisionBehavior()
         collision.translatesReferenceBoundsIntoBoundary = true
@@ -127,6 +147,10 @@ final class GravityDemoViewController: DemoViewController, UICollisionBehaviorDe
         Haptics.action()
     }
 
+    @objc private func magnitudeChanged() {
+        gravity.magnitude = CGFloat(magnitudeSlider.value)
+    }
+
     @objc private func handlePan(_ pan: UIPanGestureRecognizer) {
         let center = CGPoint(x: view.bounds.midX, y: view.bounds.midY)
         gravity.gravityDirection = viewModel.gravityDirection(
@@ -177,4 +201,7 @@ collision.addItem(ball)
 
 // Pan steers the gravity vector — the whole world tilts after the finger.
 gravity.gravityDirection = CGVector(dx: cos(angle), dy: sin(angle))
+
+// The slider scales the pull; 1 is UIKit's default strength.
+gravity.magnitude = CGFloat(slider.value)
 */

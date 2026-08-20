@@ -12,6 +12,10 @@ struct GravityDemoViewModel {
     let maxBallCount = 26
     let ballDiameterRange: ClosedRange<CGFloat> = 34...64
 
+    // Gravity strength driven by the slider; 1 is UIKit's default pull.
+    let gravityMagnitudeRange: ClosedRange<CGFloat> = 0.1...3
+    let defaultGravityMagnitude: CGFloat = 1
+
     // Physical properties shared by all balls (UIDynamicItemBehavior).
     let elasticity: CGFloat = 0.65
     let friction: CGFloat = 0.15
