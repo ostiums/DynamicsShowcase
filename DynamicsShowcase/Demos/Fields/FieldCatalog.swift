@@ -50,10 +50,10 @@ enum FieldFactory {
         case .vortex:
             let vortex = UIFieldBehavior.vortexField()
             vortex.position = position
-            vortex.strength = 0.006
+            vortex.strength = 0.003
             // A weak radial pull keeps the funnel from flying apart.
             let hold = UIFieldBehavior.radialGravityField(position: position)
-            hold.strength = 5
+            hold.strength = 6
             hold.falloff = 1
             hold.minimumRadius = 50
             return [vortex, hold]
