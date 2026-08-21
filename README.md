@@ -15,7 +15,7 @@ Jumping straight to a screen for recording: set the `AUTO_OPEN_DEMO` environment
 | 🌍 Gravity | `UIGravityBehavior` (vector steered by finger), `UICollisionBehavior` + `translatesReferenceBoundsIntoBoundary`, `UICollisionBehaviorDelegate` (flashes + haptics), elliptical collision bounds (`collisionBoundsType = .ellipse`) |
 | 🧲 Snap | `UISnapBehavior` with adjustable `damping` |
 | ⛓️ Wrecking Ball | `UIAttachmentBehavior` — anchor and item-to-item rigid links; a dense wrecking ball smashes a block tower; drag via an attachment to the finger |
-| 🚀 Push Impulses | `UIPushBehavior` — `.instantaneous` (billiards-style slingshot: force = pull distance, spin via `setTargetOffsetFromCenter`) and `.continuous` with a rotating vector |
+| 🚀 Push Impulses | `UIPushBehavior` — `.instantaneous` (billiards-style slingshot: force = pull distance, spin via `setTargetOffsetFromCenter`) and `.continuous` with a rotating vector; a white cue ball, six pockets that pot the balls, a cleared table respawns the rack |
 | 🌀 Force Fields | `UIFieldBehavior` — all 10 types: radial, spring, vortex, noise, turbulence, velocity, linear, drag, electric, magnetic (charge via `UIDynamicItemBehavior.charge`), `UIRegion` |
 | 🪐 Solar System | `radialGravityField(falloff: 2)` — a true inverse-square gravity well; planets on calibrated circular orbits (`linearVelocity(for:)`, `updateItem(usingCurrentState:)`) |
 | ⚖️ Body Properties | `UIDynamicItemBehavior` — `elasticity`, `density`, `resistance` compared side by side, a floor boundary via `addBoundary(withIdentifier:from:to:)` |
@@ -64,7 +64,7 @@ DynamicsShowcase/
 2. **Gravity** (8 s) — tap a few times, then run a finger in circles: all the balls pour along the walls following the gravity vector.
 3. **Snap** (6 s) — tap the corners on "Bouncy 0.2", switch to "Stiff 0.9", tap again.
 4. **Wrecking Ball** (8 s) — let the opening swing smash the tower, then grab the ball and wreck what's left.
-5. **Push** (7 s) — pull back from a puck like a billiards cue and release, pucks ricochet; switch to "Continuous force" for a few seconds.
+5. **Push** (7 s) — pull back and release to fire the white cue ball into the rack; sink a few balls into the pockets, then switch to "Continuous force" for a few seconds.
 6. **Force Fields** (13 s) — the showstopper: Radial → drag the finger around (the swarm chases it) → Vortex (whirlpool) → Spring (pulsing cloud) → Velocity (fountain).
 7. **Solar System** (8 s) — an orrery running on real inverse-square gravity: planets glide along their rings, trails curving behind.
 8. **Body Properties** (4 s) — tap a couple of times: the elasticity difference is instantly visible.

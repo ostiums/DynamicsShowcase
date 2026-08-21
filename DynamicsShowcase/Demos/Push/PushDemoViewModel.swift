@@ -16,9 +16,9 @@ struct PushDemoViewModel {
         }
     }
 
-    let puckCount = 5
-    let puckDiameter: CGFloat = 54
-    let ringRadius: CGFloat = 110
+    /// A billiards rack: rows of 1, 2 and 3 balls.
+    let puckCount = 6
+    let puckDiameter: CGFloat = 44
 
     // Puck physics: nearly frictionless, very bouncy — air hockey.
     let elasticity: CGFloat = 0.9
@@ -39,16 +39,58 @@ struct PushDemoViewModel {
     /// Radians added to the continuous push angle every display frame.
     let continuousRotationStep: CGFloat = 0.02
 
-    /// Initial puck centers: a pentagon around the screen center.
+    // Pockets: six of them, billiards-style — four corners plus one in
+    // the middle of each side rail.
+    let pocketRadius: CGFloat = 30
+    /// A puck whose center gets this close to a pocket center is potted.
+    let pocketCaptureDistance: CGFloat = 27
+    /// Pause before a fresh rack replaces a fully potted one.
+    let rackRespawnDelay: TimeInterval = 0.9
+
+    /// Pocket centers. `topY` is where the playfield starts — below the
+    /// navigation bar and the mode control.
+    func pocketCenters(in bounds: CGRect, topY: CGFloat) -> [CGPoint] {
+        let inset: CGFloat = 26
+        let left = inset
+        let right = bounds.width - inset
+        let bottom = bounds.height - inset
+        let middle = (topY + bottom) / 2
+        return [
+            CGPoint(x: left, y: topY),
+            CGPoint(x: right, y: topY),
+            CGPoint(x: left, y: middle),
+            CGPoint(x: right, y: middle),
+            CGPoint(x: left, y: bottom),
+            CGPoint(x: right, y: bottom),
+        ]
+    }
+
+    /// Vertical shift of the rack above the screen center — leaves room
+    /// for the cue ball below, billiards-style.
+    let rackOffsetY: CGFloat = -70
+
+    /// Initial puck centers: a billiards rack — a tight triangle with the
+    /// apex on top, slightly above the screen center.
     func puckCenters(in bounds: CGRect) -> [CGPoint] {
-        let center = CGPoint(x: bounds.midX, y: bounds.midY)
-        return (0..<puckCount).map { index in
-            let angle = CGFloat(index) * (.pi * 2 / CGFloat(puckCount)) - .pi / 2
-            return CGPoint(
-                x: center.x + cos(angle) * ringRadius,
-                y: center.y + sin(angle) * ringRadius
-            )
+        let spacing = puckDiameter + 2
+        let rowHeight = spacing * 0.87 // √3 / 2 — rows of a close-packed rack
+        var centers: [CGPoint] = []
+        var row = 0
+        while centers.count < puckCount {
+            for column in 0...row where centers.count < puckCount {
+                centers.append(CGPoint(
+                    x: bounds.midX + (CGFloat(column) - CGFloat(row) / 2) * spacing,
+                    y: bounds.midY + rackOffsetY + (CGFloat(row) - 1) * rowHeight
+                ))
+            }
+            row += 1
         }
+        return centers
+    }
+
+    /// The white cue ball spawns below the rack.
+    func cueBallCenter(in bounds: CGRect) -> CGPoint {
+        CGPoint(x: bounds.midX, y: bounds.midY + 170)
     }
 
     /// Billiards-style shot: the puck flies opposite to the pull, and the

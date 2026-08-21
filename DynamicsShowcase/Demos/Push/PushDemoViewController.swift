@@ -8,6 +8,10 @@ import UIKit
 ///   `setTargetOffsetFromCenter(_:for:)`.
 /// - `.continuous` — a constant force applied every frame; here its angle
 ///   slowly rotates, swirling all the pucks around the table.
+/// - Six pockets, billiards-style: a ball that reaches one is potted, and
+///   once the table is cleared a fresh rack rolls out.
+/// - The white cue ball is the one you shoot — pull back anywhere on the
+///   table. A potted cue ball respawns on its spot after a pause.
 final class PushDemoViewController: DemoViewController, UICollisionBehaviorDelegate {
 
     private let viewModel = PushDemoViewModel()
@@ -19,6 +23,17 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
     private let modeControl = UISegmentedControl()
     private var continuousPush: UIPushBehavior?
     private var rotationLink: CADisplayLink?
+
+    private var cueBall: BallView?
+    private var pocketCenters: [CGPoint] = []
+    private var pocketLink: CADisplayLink?
+    private var pendingRespawn: DispatchWorkItem?
+    private var pendingCueRespawn: DispatchWorkItem?
+
+    private var allBalls: [BallView] {
+        if let cueBall { return pucks + [cueBall] }
+        return pucks
+    }
 
     private let aimLayer = CAShapeLayer()
     private var grabPoint: CGPoint = .zero
@@ -32,6 +47,10 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
 
     override func viewDidLoad() {
         super.viewDidLoad()
+
+        // The billiards table speaks for itself — no navigation title.
+        navigationItem.largeTitleDisplayMode = .never
+        title = nil
 
         for (index, mode) in PushDemoViewModel.Mode.allCases.enumerated() {
             modeControl.insertSegment(withTitle: mode.title, at: index, animated: false)
@@ -64,17 +83,24 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
         if continuousPush != nil {
             startRotationLink()
         }
+        startPocketLink()
     }
 
     override func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
         stopRotationLink()
+        stopPocketLink()
     }
 
     override func buildScene() {
         pucks.removeAll()
+        cueBall = nil
         continuousPush = nil
         stopRotationLink()
+        pendingRespawn?.cancel()
+        pendingRespawn = nil
+        pendingCueRespawn?.cancel()
+        pendingCueRespawn = nil
 
         collision = UICollisionBehavior()
         collision.translatesReferenceBoundsIntoBoundary = true
@@ -90,18 +116,43 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
         animator.addBehavior(collision)
         animator.addBehavior(puckProperties)
 
-        for (index, center) in viewModel.puckCenters(in: view.bounds).enumerated() {
-            let puck = BallView(diameter: viewModel.puckDiameter, color: Palette.neon[index])
-            puck.center = center
-            contentView.addSubview(puck)
-            pucks.append(puck)
-            collision.addItem(puck)
-            puckProperties.addItem(puck)
-        }
+        pocketCenters = viewModel.pocketCenters(
+            in: view.bounds,
+            topY: view.safeAreaLayoutGuide.layoutFrame.minY + 70
+        )
+        addPocketViews()
+        spawnRack()
+        spawnCueBall()
 
         if mode == .continuous {
             startContinuousPush()
         }
+    }
+
+    private func spawnRack() {
+        for (index, center) in viewModel.puckCenters(in: view.bounds).enumerated() {
+            let puck = BallView(diameter: viewModel.puckDiameter, color: Palette.neon[index])
+            pucks.append(puck)
+            place(puck, at: center)
+        }
+    }
+
+    private func spawnCueBall() {
+        let ball = BallView(diameter: viewModel.puckDiameter, color: .white)
+        cueBall = ball
+        place(ball, at: viewModel.cueBallCenter(in: view.bounds))
+        // A cue ball respawned mid-swirl joins the continuous force too.
+        continuousPush?.addItem(ball)
+    }
+
+    private func place(_ ball: BallView, at center: CGPoint) {
+        ball.center = center
+        contentView.addSubview(ball)
+        collision.addItem(ball)
+        puckProperties.addItem(ball)
+
+        ball.transform = CGAffineTransform(scaleX: 0.01, y: 0.01)
+        UIView.animate(withDuration: 0.2) { ball.transform = .identity }
     }
 
     // MARK: - Slingshot (.instantaneous)
@@ -113,7 +164,8 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
         switch pan.state {
         case .began:
             grabPoint = location
-            aimedPuck = pucks.nearest(to: location)
+            // Billiards: the shot always fires the white cue ball.
+            aimedPuck = cueBall
 
         case .changed:
             guard let puck = aimedPuck else { return }
@@ -166,7 +218,7 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
 
     private func startContinuousPush() {
         stopContinuousPush()
-        let push = UIPushBehavior(items: pucks, mode: .continuous)
+        let push = UIPushBehavior(items: allBalls, mode: .continuous)
         push.magnitude = viewModel.continuousMagnitude
         push.angle = -.pi / 2
         animator.addBehavior(push)
@@ -196,6 +248,105 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
 
     @objc private func rotatePushVector() {
         continuousPush?.angle += viewModel.continuousRotationStep
+    }
+
+    // MARK: - Pockets
+
+    private func addPocketViews() {
+        let radius = viewModel.pocketRadius
+        for center in pocketCenters {
+            let pocket = UIView(frame: CGRect(x: 0, y: 0, width: radius * 2, height: radius * 2))
+            pocket.center = center
+            pocket.backgroundColor = UIColor.black.withAlphaComponent(0.55)
+            pocket.layer.cornerRadius = radius
+            pocket.layer.borderWidth = 2
+            pocket.layer.borderColor = UIColor.white.withAlphaComponent(0.12).cgColor
+            contentView.addSubview(pocket)
+        }
+    }
+
+    private func startPocketLink() {
+        stopPocketLink()
+        let link = CADisplayLink(target: self, selector: #selector(checkPockets))
+        link.add(to: .main, forMode: .common)
+        pocketLink = link
+    }
+
+    private func stopPocketLink() {
+        pocketLink?.invalidate()
+        pocketLink = nil
+    }
+
+    /// A ball whose center reaches a pocket is potted.
+    @objc private func checkPockets() {
+        for ball in allBalls {
+            let pocket = pocketCenters.first { center in
+                hypot(ball.center.x - center.x, ball.center.y - center.y)
+                    < viewModel.pocketCaptureDistance
+            }
+            if let pocket {
+                pot(ball, into: pocket)
+            }
+        }
+    }
+
+    /// Takes the ball out of the simulation and swallows it into the pocket.
+    private func pot(_ ball: BallView, into pocket: CGPoint) {
+        if ball === cueBall {
+            cueBall = nil
+            scheduleCueRespawn()
+        } else {
+            pucks.removeAll { $0 === ball }
+            if pucks.isEmpty {
+                scheduleRackRespawn()
+            }
+        }
+        collision.removeItem(ball)
+        puckProperties.removeItem(ball)
+        continuousPush?.removeItem(ball)
+        Haptics.collision(intensity: 0.9)
+
+        UIView.animate(
+            withDuration: 0.25,
+            animations: {
+                ball.center = pocket
+                ball.transform = CGAffineTransform(scaleX: 0.1, y: 0.1)
+                ball.alpha = 0
+            },
+            completion: { _ in
+                ball.removeFromSuperview()
+            }
+        )
+    }
+
+    /// The table is cleared — roll out a fresh rack after a short pause.
+    private func scheduleRackRespawn() {
+        pendingRespawn?.cancel()
+        let respawn = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.spawnRack()
+            if self.mode == .continuous {
+                self.startContinuousPush()
+            }
+        }
+        pendingRespawn = respawn
+        DispatchQueue.main.asyncAfter(
+            deadline: .now() + viewModel.rackRespawnDelay,
+            execute: respawn
+        )
+    }
+
+    /// A potted (scratched) cue ball comes back to its spot.
+    private func scheduleCueRespawn() {
+        pendingCueRespawn?.cancel()
+        let respawn = DispatchWorkItem { [weak self] in
+            self?.spawnCueBall()
+        }
+        pendingCueRespawn = respawn
+        DispatchQueue.main.asyncAfter(
+            deadline: .now() + viewModel.rackRespawnDelay,
+            execute: respawn
+        )
     }
 
     // MARK: - UICollisionBehaviorDelegate
