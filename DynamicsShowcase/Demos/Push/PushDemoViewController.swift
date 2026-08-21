@@ -12,6 +12,12 @@ import UIKit
 ///   once the table is cleared a fresh rack rolls out.
 /// - The white cue ball is the one you shoot — pull back anywhere on the
 ///   table. A potted cue ball respawns on its spot after a pause.
+/// - "Real UI" mode is the proof of the whole showcase: the target is a
+///   live fake settings screen — labels, cards, a working UISwitch,
+///   buttons — ordinary UIKit views, not sprites. Each cell hangs on an
+///   invisible spring, weighs in proportion to its area, and squashes
+///   with a flash when the cue ball slams into it — and a hard enough
+///   shot shatters the cell into spinning snapshot shards.
 final class PushDemoViewController: DemoViewController, UICollisionBehaviorDelegate {
 
     private let viewModel = PushDemoViewModel()
@@ -25,10 +31,19 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
     private var rotationLink: CADisplayLink?
 
     private var cueBall: BallView?
+    /// Boundary-free collisions between the cue ball and the fake-screen
+    /// targets ("Real UI" mode only).
+    private var targetCollision: UICollisionBehavior?
+    /// The body and spring of every intact fake-screen element, so a
+    /// shattered one can be pulled out of the simulation cleanly.
+    private var targetBehaviors: [UIView: [UIDynamicBehavior]] = [:]
+    private var pendingCleanups: [DispatchWorkItem] = []
     private var pocketCenters: [CGPoint] = []
     private var pocketLink: CADisplayLink?
     private var pendingRespawn: DispatchWorkItem?
     private var pendingCueRespawn: DispatchWorkItem?
+    /// Which furniture the current scene was built with (rack vs. buttons).
+    private var uiLayoutActive = false
 
     private var allBalls: [BallView] {
         if let cueBall { return pucks + [cueBall] }
@@ -51,6 +66,11 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
         // The billiards table speaks for itself — no navigation title.
         navigationItem.largeTitleDisplayMode = .never
         title = nil
+
+        // Burgundy felt instead of the standard gradient, in every mode.
+        let felt = FeltBackgroundView(frame: view.bounds)
+        felt.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        view.insertSubview(felt, belowSubview: contentView)
 
         for (index, mode) in PushDemoViewModel.Mode.allCases.enumerated() {
             modeControl.insertSegment(withTitle: mode.title, at: index, animated: false)
@@ -95,16 +115,40 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
     override func buildScene() {
         pucks.removeAll()
         cueBall = nil
+        targetCollision = nil
+        targetBehaviors.removeAll()
         continuousPush = nil
         stopRotationLink()
         pendingRespawn?.cancel()
         pendingRespawn = nil
         pendingCueRespawn?.cancel()
         pendingCueRespawn = nil
+        pendingCleanups.forEach { $0.cancel() }
+        pendingCleanups.removeAll()
 
         collision = UICollisionBehavior()
-        collision.translatesReferenceBoundsIntoBoundary = true
         collision.collisionDelegate = self
+
+        // The playfield ends at the navigation bar: an explicit rect
+        // boundary instead of translatesReferenceBoundsIntoBoundary,
+        // which would let the balls fly up under the bar.
+        let tableTop = view.safeAreaLayoutGuide.layoutFrame.minY
+        collision.addBoundary(
+            withIdentifier: "table" as NSString,
+            for: UIBezierPath(rect: CGRect(
+                x: 0,
+                y: tableTop,
+                width: view.bounds.width,
+                height: view.bounds.height - tableTop
+            ))
+        )
+        // A thin rail line so the top wall the balls bounce off is visible.
+        contentView.layer.addSublayer(CAShapeLayer.boundaryLine(
+            from: CGPoint(x: 0, y: tableTop),
+            to: CGPoint(x: view.bounds.width, y: tableTop),
+            color: UIColor.white.withAlphaComponent(0.25),
+            glow: nil
+        ))
 
         puckProperties = UIDynamicItemBehavior()
         puckProperties.elasticity = viewModel.elasticity
@@ -116,12 +160,18 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
         animator.addBehavior(collision)
         animator.addBehavior(puckProperties)
 
-        pocketCenters = viewModel.pocketCenters(
-            in: view.bounds,
-            topY: view.safeAreaLayoutGuide.layoutFrame.minY + 70
-        )
-        addPocketViews()
-        spawnRack()
+        uiLayoutActive = (mode == .ui)
+        if uiLayoutActive {
+            pocketCenters = []
+            spawnUITargets()
+        } else {
+            pocketCenters = viewModel.pocketCenters(
+                in: view.bounds,
+                tableTop: tableTop
+            )
+            addPocketViews()
+            spawnRack()
+        }
         spawnCueBall()
 
         if mode == .continuous {
@@ -140,9 +190,22 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
     private func spawnCueBall() {
         let ball = BallView(diameter: viewModel.puckDiameter, color: .white)
         cueBall = ball
-        place(ball, at: viewModel.cueBallCenter(in: view.bounds))
-        // A cue ball respawned mid-swirl joins the continuous force too.
+        let center = uiLayoutActive
+            ? viewModel.uiCueBallCenter(in: view.bounds)
+            : viewModel.cueBallCenter(in: view.bounds)
+        place(ball, at: center)
+        // The cue ball also collides with the fake-screen targets…
+        targetCollision?.addItem(ball)
+        // …and a cue ball respawned mid-swirl joins the continuous force.
         continuousPush?.addItem(ball)
+
+        if uiLayoutActive {
+            // Extra mass for the wrecking job: the most specific
+            // UIDynamicItemBehavior wins, overriding the shared density.
+            let heavy = UIDynamicItemBehavior(items: [ball])
+            heavy.density = viewModel.uiCueBallDensity
+            animator.addBehavior(heavy)
+        }
     }
 
     private func place(_ ball: BallView, at center: CGPoint) {
@@ -155,10 +218,222 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
         UIView.animate(withDuration: 0.2) { ball.transform = .identity }
     }
 
+    /// The point of the whole showcase in one scene: the targets are a live
+    /// fake settings screen — labels, cards, a real UISwitch, buttons of
+    /// every kind — and they all collide like any other dynamic item.
+    private func spawnUITargets() {
+        // The targets stay out of the table boundary — it's their springs,
+        // not walls, that keep them on screen. This boundary-free behavior
+        // makes the cue ball collide with them (it joins in spawnCueBall)
+        // and them with each other.
+        let smashCollision = UICollisionBehavior()
+        smashCollision.collisionMode = .items
+        smashCollision.collisionDelegate = self
+        animator.addBehavior(smashCollision)
+        targetCollision = smashCollision
+
+        func add(_ target: UIView) {
+            contentView.addSubview(target)
+            smashCollision.addItem(target)
+
+            // Per-element body: the density scales with the element's
+            // area, so a toggle row and the profile cell take the same
+            // hit very differently.
+            let body = UIDynamicItemBehavior(items: [target])
+            body.density = viewModel.targetDensity(
+                forArea: target.bounds.width * target.bounds.height
+            )
+            body.elasticity = viewModel.targetElasticity
+            body.friction = viewModel.targetFriction
+            body.resistance = viewModel.targetResistance
+            animator.addBehavior(body)
+
+            // The invisible spring that rocks the cell and pulls it back
+            // to its home spot after every hit.
+            let spring = UIAttachmentBehavior(item: target, attachedToAnchor: target.center)
+            spring.length = 0
+            spring.frequency = viewModel.targetSpringFrequency
+            spring.damping = viewModel.targetSpringDamping
+            animator.addBehavior(spring)
+
+            targetBehaviors[target] = [body, spring]
+        }
+
+        let margin: CGFloat = 24
+        let width = view.bounds.width - margin * 2
+        var y = view.safeAreaLayoutGuide.layoutFrame.minY + 56
+
+        let title = makeUILabel(
+            viewModel.uiScreenTitle,
+            font: UIFont.systemFont(ofSize: 32, weight: .bold).rounded(),
+            color: .white
+        )
+        title.sizeToFit()
+        title.frame.origin = CGPoint(x: margin, y: y)
+        add(title)
+        y = title.frame.maxY + 16
+
+        let profile = makeProfileCard(frame: CGRect(x: margin, y: y, width: width, height: 76))
+        add(profile)
+        y = profile.frame.maxY + 12
+
+        let toggleRow = makeToggleRow(frame: CGRect(x: margin, y: y, width: width, height: 52))
+        add(toggleRow)
+        y = toggleRow.frame.maxY + 12
+
+        let linkRow = makeLinkRow(frame: CGRect(x: margin, y: y, width: width, height: 52))
+        add(linkRow)
+        y = linkRow.frame.maxY + 16
+
+        let primary = makeUIButton(
+            viewModel.uiPrimaryTitle,
+            titleColor: .black,
+            background: Palette.amber
+        )
+        primary.frame = CGRect(x: margin, y: y, width: width, height: 52)
+        add(primary)
+        y = primary.frame.maxY + 12
+
+        let secondary = makeUIButton(
+            viewModel.uiSecondaryTitle,
+            titleColor: .white,
+            background: UIColor.white.withAlphaComponent(0.12)
+        )
+        secondary.frame = CGRect(x: margin, y: y, width: width, height: 48)
+        add(secondary)
+        y = secondary.frame.maxY + 10
+
+        let signOut = UIButton(type: .system)
+        signOut.setTitle(viewModel.uiDestructiveTitle, for: .normal)
+        signOut.setTitleColor(UIColor(red: 1, green: 0.4, blue: 0.4, alpha: 1), for: .normal)
+        signOut.titleLabel?.font = UIFont.systemFont(ofSize: 16, weight: .semibold).rounded()
+        signOut.sizeToFit()
+        signOut.center = CGPoint(x: view.bounds.midX, y: y + signOut.bounds.height / 2)
+        add(signOut)
+    }
+
+    // MARK: Fake-screen building blocks
+
+    private func makeUILabel(_ text: String, font: UIFont, color: UIColor) -> UILabel {
+        let label = UILabel()
+        label.text = text
+        label.font = font
+        label.textColor = color
+        return label
+    }
+
+    private func makeUIButton(_ title: String, titleColor: UIColor, background: UIColor) -> UIButton {
+        let button = UIButton(type: .system)
+        button.setTitle(title, for: .normal)
+        button.setTitleColor(titleColor, for: .normal)
+        button.titleLabel?.font = UIFont.systemFont(ofSize: 17, weight: .semibold).rounded()
+        button.backgroundColor = background
+        button.layer.cornerRadius = 14
+        button.layer.cornerCurve = .continuous
+        return button
+    }
+
+    private func makeCard(frame: CGRect) -> UIView {
+        let card = UIView(frame: frame)
+        card.backgroundColor = UIColor.white.withAlphaComponent(0.1)
+        card.layer.cornerRadius = 14
+        card.layer.cornerCurve = .continuous
+        return card
+    }
+
+    private func makeChevron(in card: UIView) -> UIImageView {
+        let chevron = UIImageView(image: UIImage(systemName: "chevron.right"))
+        chevron.preferredSymbolConfiguration = UIImage.SymbolConfiguration(pointSize: 13, weight: .semibold)
+        chevron.tintColor = UIColor.white.withAlphaComponent(0.4)
+        chevron.sizeToFit()
+        chevron.center = CGPoint(x: card.bounds.width - 20, y: card.bounds.height / 2)
+        return chevron
+    }
+
+    private func makeProfileCard(frame: CGRect) -> UIView {
+        let card = makeCard(frame: frame)
+
+        let avatar = makeUILabel(
+            viewModel.uiProfileInitials,
+            font: UIFont.systemFont(ofSize: 18, weight: .bold).rounded(),
+            color: .white
+        )
+        avatar.textAlignment = .center
+        avatar.backgroundColor = Palette.cyan.withAlphaComponent(0.6)
+        avatar.frame = CGRect(x: 14, y: 14, width: 48, height: 48)
+        avatar.layer.cornerRadius = 24
+        avatar.layer.masksToBounds = true
+        card.addSubview(avatar)
+
+        let name = makeUILabel(
+            viewModel.uiProfileName,
+            font: UIFont.systemFont(ofSize: 17, weight: .semibold).rounded(),
+            color: .white
+        )
+        name.frame = CGRect(x: 76, y: 17, width: frame.width - 110, height: 22)
+        card.addSubview(name)
+
+        let detail = makeUILabel(
+            viewModel.uiProfileDetail,
+            font: UIFont.systemFont(ofSize: 13, weight: .regular),
+            color: UIColor.white.withAlphaComponent(0.55)
+        )
+        detail.frame = CGRect(x: 76, y: 41, width: frame.width - 110, height: 18)
+        card.addSubview(detail)
+
+        card.addSubview(makeChevron(in: card))
+        return card
+    }
+
+    private func makeToggleRow(frame: CGRect) -> UIView {
+        let row = makeCard(frame: frame)
+
+        let label = makeUILabel(
+            viewModel.uiToggleTitle,
+            font: UIFont.systemFont(ofSize: 16, weight: .medium).rounded(),
+            color: .white
+        )
+        label.frame = CGRect(x: 16, y: 0, width: frame.width - 90, height: frame.height)
+        row.addSubview(label)
+
+        // A real, working UISwitch — flip it, then smash it.
+        let toggle = UISwitch()
+        toggle.isOn = false
+        toggle.onTintColor = Palette.mint.withAlphaComponent(0.7)
+        toggle.center = CGPoint(x: frame.width - 16 - toggle.bounds.width / 2, y: frame.height / 2)
+        row.addSubview(toggle)
+
+        return row
+    }
+
+    private func makeLinkRow(frame: CGRect) -> UIView {
+        let row = makeCard(frame: frame)
+
+        let label = makeUILabel(
+            viewModel.uiLinkTitle,
+            font: UIFont.systemFont(ofSize: 16, weight: .medium).rounded(),
+            color: .white
+        )
+        label.frame = CGRect(x: 16, y: 0, width: frame.width / 2, height: frame.height)
+        row.addSubview(label)
+
+        let value = makeUILabel(
+            viewModel.uiLinkValue,
+            font: UIFont.systemFont(ofSize: 16, weight: .regular),
+            color: UIColor.white.withAlphaComponent(0.55)
+        )
+        value.textAlignment = .right
+        value.frame = CGRect(x: frame.width - 140, y: 0, width: 100, height: frame.height)
+        row.addSubview(value)
+
+        row.addSubview(makeChevron(in: row))
+        return row
+    }
+
     // MARK: - Slingshot (.instantaneous)
 
     @objc private func handlePan(_ pan: UIPanGestureRecognizer) {
-        guard mode == .impulse else { return }
+        guard mode != .continuous else { return }
         let location = pan.location(in: contentView)
 
         switch pan.state {
@@ -174,8 +449,14 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
         case .ended:
             aimLayer.path = nil
             guard let puck = aimedPuck,
-                  let impulse = viewModel.impulseVector(pullingFrom: location, puckCenter: puck.center)
+                  var impulse = viewModel.impulseVector(pullingFrom: location, puckCenter: puck.center)
             else { return }
+
+            if uiLayoutActive {
+                // The wrecking ball is heavier — boost the shot to match.
+                impulse.dx *= viewModel.uiImpulseBoost
+                impulse.dy *= viewModel.uiImpulseBoost
+            }
 
             let push = UIPushBehavior(items: [puck], mode: .instantaneous)
             push.pushDirection = impulse
@@ -209,6 +490,12 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
     // MARK: - Continuous force (.continuous)
 
     @objc private func modeChanged() {
+        // Entering or leaving "Real UI" swaps the furniture — rebuild the
+        // scene. Impulse ↔ continuous just toggles the force.
+        if (mode == .ui) != uiLayoutActive {
+            resetScene()
+            return
+        }
         if mode == .continuous {
             startContinuousPush()
         } else {
@@ -358,6 +645,130 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
         at p: CGPoint
     ) {
         reactToContact(item1, item2, intensity: 0.6)
+        squashOnContact(item1)
+        squashOnContact(item2)
+        shatterIfSmashed(item1, by: item2)
+        shatterIfSmashed(item2, by: item1)
+    }
+
+    /// A short jelly squash plus a border flash the instant a fake-screen
+    /// element is hit. Layer animations override the model values the
+    /// animator keeps writing, so they play cleanly mid-flight.
+    private func squashOnContact(_ item: UIDynamicItem) {
+        guard let target = item as? UIView, !(target is BallView) else { return }
+
+        let squashX = CAKeyframeAnimation(keyPath: "transform.scale.x")
+        squashX.values = [1.0, 1.06, 0.97, 1.0]
+        let squashY = CAKeyframeAnimation(keyPath: "transform.scale.y")
+        squashY.values = [1.0, 0.9, 1.04, 1.0]
+        for squash in [squashX, squashY] {
+            squash.keyTimes = [0, 0.35, 0.7, 1]
+            squash.duration = 0.22
+        }
+
+        target.layer.borderColor = UIColor.white.withAlphaComponent(0.8).cgColor
+        let border = CABasicAnimation(keyPath: "borderWidth")
+        border.fromValue = 2
+        border.toValue = 0
+        border.duration = 0.3
+
+        target.layer.add(squashX, forKey: "contactSquashX")
+        target.layer.add(squashY, forKey: "contactSquashY")
+        target.layer.add(border, forKey: "contactBorder")
+    }
+
+    // MARK: - Shattering
+
+    /// A cell hit by a fast-enough cue ball doesn't just rock — it breaks.
+    private func shatterIfSmashed(_ item: UIDynamicItem, by other: UIDynamicItem) {
+        guard let target = item as? UIView,
+              targetBehaviors[target] != nil,
+              let ball = other as? BallView
+        else { return }
+
+        let velocity = puckProperties.linearVelocity(for: ball)
+        guard hypot(velocity.x, velocity.y) > viewModel.shatterSpeedThreshold else { return }
+        shatter(target, ballVelocity: velocity)
+    }
+
+    /// The most screenshot-worthy moment: the cell splits into snapshot
+    /// shards that spin away, rain down and get swept up afterwards.
+    private func shatter(_ target: UIView, ballVelocity: CGPoint) {
+        guard let shards = makeShards(of: target) else { return }
+
+        // The original leaves the simulation entirely.
+        targetBehaviors.removeValue(forKey: target)?.forEach { animator.removeBehavior($0) }
+        targetCollision?.removeItem(target)
+        target.removeFromSuperview()
+        Haptics.collision(intensity: 1)
+
+        let debris = UIDynamicItemBehavior(items: shards)
+        debris.resistance = viewModel.shardResistance
+        // This screen has no global gravity — only the shards fall.
+        let fall = UIGravityBehavior(items: shards)
+        animator.addBehavior(debris)
+        animator.addBehavior(fall)
+
+        for shard in shards {
+            let dx = shard.center.x - target.center.x
+            let dy = shard.center.y - target.center.y
+            let radial = max(1, hypot(dx, dy))
+            let burst = CGFloat.random(in: viewModel.shardBurstSpeed)
+            debris.addLinearVelocity(
+                CGPoint(
+                    x: dx / radial * burst + ballVelocity.x * 0.3,
+                    y: dy / radial * burst + ballVelocity.y * 0.3
+                ),
+                for: shard
+            )
+            debris.addAngularVelocity(.random(in: viewModel.shardSpinRange), for: shard)
+        }
+
+        // Sweep the debris once it has fallen off the screen.
+        let cleanup = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.animator.removeBehavior(debris)
+            self.animator.removeBehavior(fall)
+            shards.forEach { $0.removeFromSuperview() }
+        }
+        pendingCleanups.append(cleanup)
+        DispatchQueue.main.asyncAfter(
+            deadline: .now() + viewModel.shardCleanupDelay,
+            execute: cleanup
+        )
+    }
+
+    /// Slices the cell's live snapshot into a grid of 4–6 pieces.
+    private func makeShards(of target: UIView) -> [UIView]? {
+        let size = target.bounds.size
+        guard size.width > 1, size.height > 1 else { return nil }
+
+        let columns = size.width > 200 ? 3 : 2
+        let rows = 2
+        let pieceWidth = size.width / CGFloat(columns)
+        let pieceHeight = size.height / CGFloat(rows)
+
+        var shards: [UIView] = []
+        for row in 0..<rows {
+            for column in 0..<columns {
+                let rect = CGRect(
+                    x: CGFloat(column) * pieceWidth,
+                    y: CGFloat(row) * pieceHeight,
+                    width: pieceWidth,
+                    height: pieceHeight
+                )
+                guard let shard = target.resizableSnapshotView(
+                    from: rect,
+                    afterScreenUpdates: false,
+                    withCapInsets: .zero
+                ) else { continue }
+                shard.center = target.convert(CGPoint(x: rect.midX, y: rect.midY), to: contentView)
+                shard.transform = target.transform
+                contentView.addSubview(shard)
+                shards.append(shard)
+            }
+        }
+        return shards.isEmpty ? nil : shards
     }
 
     func collisionBehavior(
@@ -368,6 +779,23 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
     ) {
         reactToContact(item, intensity: 0.4)
     }
+}
+
+/// Burgundy felt: the billiards-table backdrop this screen uses in place
+/// of the standard gradient.
+private final class FeltBackgroundView: UIView {
+    override class var layerClass: AnyClass { CAGradientLayer.self }
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        let gradient = layer as! CAGradientLayer
+        gradient.colors = [
+            UIColor(red: 0.38, green: 0.09, blue: 0.17, alpha: 1).cgColor,
+            UIColor(red: 0.21, green: 0.04, blue: 0.10, alpha: 1).cgColor,
+        ]
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 }
 
 // MARK: - Screenshot snippet
