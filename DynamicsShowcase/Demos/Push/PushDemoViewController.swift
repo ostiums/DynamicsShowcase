@@ -34,9 +34,21 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
     /// Boundary-free collisions between the cue ball and the fake-screen
     /// targets ("Real UI" mode only).
     private var targetCollision: UICollisionBehavior?
-    /// The body and spring of every intact fake-screen element, so a
-    /// shattered one can be pulled out of the simulation cleanly.
-    private var targetBehaviors: [UIView: [UIDynamicBehavior]] = [:]
+    /// The behaviors owned by one intact fake-screen element.
+    private struct TargetSimulation {
+        let body: UIDynamicItemBehavior
+        let spring: UIAttachmentBehavior
+    }
+
+    /// Per-element simulations, so a shattered element can be pulled out
+    /// of the animator cleanly.
+    private var targetSimulations: [UIView: TargetSimulation] = [:]
+    /// The extra-density behavior of the "Real UI" cue ball.
+    private var cueHeavyBehavior: UIDynamicItemBehavior?
+    /// The cue ball's velocity sampled one frame before a contact —
+    /// beganContact fires after the collision is resolved, when the
+    /// ball has already bounced and slowed down.
+    private var lastCueVelocity: CGPoint = .zero
     private var pendingCleanups: [DispatchWorkItem] = []
     private var pocketCenters: [CGPoint] = []
     private var pocketLink: CADisplayLink?
@@ -116,7 +128,9 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
         pucks.removeAll()
         cueBall = nil
         targetCollision = nil
-        targetBehaviors.removeAll()
+        targetSimulations.removeAll()
+        cueHeavyBehavior = nil
+        lastCueVelocity = .zero
         continuousPush = nil
         stopRotationLink()
         pendingRespawn?.cancel()
@@ -205,6 +219,7 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
             let heavy = UIDynamicItemBehavior(items: [ball])
             heavy.density = viewModel.uiCueBallDensity
             animator.addBehavior(heavy)
+            cueHeavyBehavior = heavy
         }
     }
 
@@ -232,13 +247,19 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
         animator.addBehavior(smashCollision)
         targetCollision = smashCollision
 
-        func add(_ target: UIView) {
+        for target in FakeSettingsScreen.makeElements(
+            content: viewModel,
+            in: view.bounds,
+            topY: view.safeAreaLayoutGuide.layoutFrame.minY + 56
+        ) {
             contentView.addSubview(target)
             smashCollision.addItem(target)
 
             // Per-element body: the density scales with the element's
             // area, so a toggle row and the profile cell take the same
-            // hit very differently.
+            // hit very differently. Rotation stays off — the spring is
+            // anchored at the center and exerts no torque, so a spun
+            // cell would settle crooked instead of straightening out.
             let body = UIDynamicItemBehavior(items: [target])
             body.density = viewModel.targetDensity(
                 forArea: target.bounds.width * target.bounds.height
@@ -246,6 +267,7 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
             body.elasticity = viewModel.targetElasticity
             body.friction = viewModel.targetFriction
             body.resistance = viewModel.targetResistance
+            body.allowsRotation = false
             animator.addBehavior(body)
 
             // The invisible spring that rocks the cell and pulls it back
@@ -256,178 +278,8 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
             spring.damping = viewModel.targetSpringDamping
             animator.addBehavior(spring)
 
-            targetBehaviors[target] = [body, spring]
+            targetSimulations[target] = TargetSimulation(body: body, spring: spring)
         }
-
-        let margin: CGFloat = 24
-        let width = view.bounds.width - margin * 2
-        var y = view.safeAreaLayoutGuide.layoutFrame.minY + 56
-
-        let title = makeUILabel(
-            viewModel.uiScreenTitle,
-            font: UIFont.systemFont(ofSize: 32, weight: .bold).rounded(),
-            color: .white
-        )
-        title.sizeToFit()
-        title.frame.origin = CGPoint(x: margin, y: y)
-        add(title)
-        y = title.frame.maxY + 16
-
-        let profile = makeProfileCard(frame: CGRect(x: margin, y: y, width: width, height: 76))
-        add(profile)
-        y = profile.frame.maxY + 12
-
-        let toggleRow = makeToggleRow(frame: CGRect(x: margin, y: y, width: width, height: 52))
-        add(toggleRow)
-        y = toggleRow.frame.maxY + 12
-
-        let linkRow = makeLinkRow(frame: CGRect(x: margin, y: y, width: width, height: 52))
-        add(linkRow)
-        y = linkRow.frame.maxY + 16
-
-        let primary = makeUIButton(
-            viewModel.uiPrimaryTitle,
-            titleColor: .black,
-            background: Palette.amber
-        )
-        primary.frame = CGRect(x: margin, y: y, width: width, height: 52)
-        add(primary)
-        y = primary.frame.maxY + 12
-
-        let secondary = makeUIButton(
-            viewModel.uiSecondaryTitle,
-            titleColor: .white,
-            background: UIColor.white.withAlphaComponent(0.12)
-        )
-        secondary.frame = CGRect(x: margin, y: y, width: width, height: 48)
-        add(secondary)
-        y = secondary.frame.maxY + 10
-
-        let signOut = UIButton(type: .system)
-        signOut.setTitle(viewModel.uiDestructiveTitle, for: .normal)
-        signOut.setTitleColor(UIColor(red: 1, green: 0.4, blue: 0.4, alpha: 1), for: .normal)
-        signOut.titleLabel?.font = UIFont.systemFont(ofSize: 16, weight: .semibold).rounded()
-        signOut.sizeToFit()
-        signOut.center = CGPoint(x: view.bounds.midX, y: y + signOut.bounds.height / 2)
-        add(signOut)
-    }
-
-    // MARK: Fake-screen building blocks
-
-    private func makeUILabel(_ text: String, font: UIFont, color: UIColor) -> UILabel {
-        let label = UILabel()
-        label.text = text
-        label.font = font
-        label.textColor = color
-        return label
-    }
-
-    private func makeUIButton(_ title: String, titleColor: UIColor, background: UIColor) -> UIButton {
-        let button = UIButton(type: .system)
-        button.setTitle(title, for: .normal)
-        button.setTitleColor(titleColor, for: .normal)
-        button.titleLabel?.font = UIFont.systemFont(ofSize: 17, weight: .semibold).rounded()
-        button.backgroundColor = background
-        button.layer.cornerRadius = 14
-        button.layer.cornerCurve = .continuous
-        return button
-    }
-
-    private func makeCard(frame: CGRect) -> UIView {
-        let card = UIView(frame: frame)
-        card.backgroundColor = UIColor.white.withAlphaComponent(0.1)
-        card.layer.cornerRadius = 14
-        card.layer.cornerCurve = .continuous
-        return card
-    }
-
-    private func makeChevron(in card: UIView) -> UIImageView {
-        let chevron = UIImageView(image: UIImage(systemName: "chevron.right"))
-        chevron.preferredSymbolConfiguration = UIImage.SymbolConfiguration(pointSize: 13, weight: .semibold)
-        chevron.tintColor = UIColor.white.withAlphaComponent(0.4)
-        chevron.sizeToFit()
-        chevron.center = CGPoint(x: card.bounds.width - 20, y: card.bounds.height / 2)
-        return chevron
-    }
-
-    private func makeProfileCard(frame: CGRect) -> UIView {
-        let card = makeCard(frame: frame)
-
-        let avatar = makeUILabel(
-            viewModel.uiProfileInitials,
-            font: UIFont.systemFont(ofSize: 18, weight: .bold).rounded(),
-            color: .white
-        )
-        avatar.textAlignment = .center
-        avatar.backgroundColor = Palette.cyan.withAlphaComponent(0.6)
-        avatar.frame = CGRect(x: 14, y: 14, width: 48, height: 48)
-        avatar.layer.cornerRadius = 24
-        avatar.layer.masksToBounds = true
-        card.addSubview(avatar)
-
-        let name = makeUILabel(
-            viewModel.uiProfileName,
-            font: UIFont.systemFont(ofSize: 17, weight: .semibold).rounded(),
-            color: .white
-        )
-        name.frame = CGRect(x: 76, y: 17, width: frame.width - 110, height: 22)
-        card.addSubview(name)
-
-        let detail = makeUILabel(
-            viewModel.uiProfileDetail,
-            font: UIFont.systemFont(ofSize: 13, weight: .regular),
-            color: UIColor.white.withAlphaComponent(0.55)
-        )
-        detail.frame = CGRect(x: 76, y: 41, width: frame.width - 110, height: 18)
-        card.addSubview(detail)
-
-        card.addSubview(makeChevron(in: card))
-        return card
-    }
-
-    private func makeToggleRow(frame: CGRect) -> UIView {
-        let row = makeCard(frame: frame)
-
-        let label = makeUILabel(
-            viewModel.uiToggleTitle,
-            font: UIFont.systemFont(ofSize: 16, weight: .medium).rounded(),
-            color: .white
-        )
-        label.frame = CGRect(x: 16, y: 0, width: frame.width - 90, height: frame.height)
-        row.addSubview(label)
-
-        // A real, working UISwitch — flip it, then smash it.
-        let toggle = UISwitch()
-        toggle.isOn = false
-        toggle.onTintColor = Palette.mint.withAlphaComponent(0.7)
-        toggle.center = CGPoint(x: frame.width - 16 - toggle.bounds.width / 2, y: frame.height / 2)
-        row.addSubview(toggle)
-
-        return row
-    }
-
-    private func makeLinkRow(frame: CGRect) -> UIView {
-        let row = makeCard(frame: frame)
-
-        let label = makeUILabel(
-            viewModel.uiLinkTitle,
-            font: UIFont.systemFont(ofSize: 16, weight: .medium).rounded(),
-            color: .white
-        )
-        label.frame = CGRect(x: 16, y: 0, width: frame.width / 2, height: frame.height)
-        row.addSubview(label)
-
-        let value = makeUILabel(
-            viewModel.uiLinkValue,
-            font: UIFont.systemFont(ofSize: 16, weight: .regular),
-            color: UIColor.white.withAlphaComponent(0.55)
-        )
-        value.textAlignment = .right
-        value.frame = CGRect(x: frame.width - 140, y: 0, width: 100, height: frame.height)
-        row.addSubview(value)
-
-        row.addSubview(makeChevron(in: row))
-        return row
     }
 
     // MARK: - Slingshot (.instantaneous)
@@ -554,7 +406,7 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
 
     private func startPocketLink() {
         stopPocketLink()
-        let link = CADisplayLink(target: self, selector: #selector(checkPockets))
+        let link = CADisplayLink(target: self, selector: #selector(tableTick))
         link.add(to: .main, forMode: .common)
         pocketLink = link
     }
@@ -564,8 +416,18 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
         pocketLink = nil
     }
 
+    /// Every frame: remember the cue ball's pre-contact velocity (the
+    /// shatter check needs it) and pot any ball that reached a pocket.
+    @objc private func tableTick() {
+        if let cueBall {
+            lastCueVelocity = puckProperties.linearVelocity(for: cueBall)
+        }
+        checkPockets()
+    }
+
     /// A ball whose center reaches a pocket is potted.
-    @objc private func checkPockets() {
+    private func checkPockets() {
+        guard !pocketCenters.isEmpty else { return }
         for ball in allBalls {
             let pocket = pocketCenters.first { center in
                 hypot(ball.center.x - center.x, ball.center.y - center.y)
@@ -581,6 +443,12 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
     private func pot(_ ball: BallView, into pocket: CGPoint) {
         if ball === cueBall {
             cueBall = nil
+            // Symmetric to spawnCueBall: leave every behavior it joined.
+            targetCollision?.removeItem(ball)
+            if let cueHeavyBehavior {
+                animator.removeBehavior(cueHeavyBehavior)
+                self.cueHeavyBehavior = nil
+            }
             scheduleCueRespawn()
         } else {
             pucks.removeAll { $0 === ball }
@@ -609,31 +477,30 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
     /// The table is cleared — roll out a fresh rack after a short pause.
     private func scheduleRackRespawn() {
         pendingRespawn?.cancel()
-        let respawn = DispatchWorkItem { [weak self] in
+        pendingRespawn = scheduleRespawn { [weak self] in
             guard let self else { return }
             self.spawnRack()
             if self.mode == .continuous {
                 self.startContinuousPush()
             }
         }
-        pendingRespawn = respawn
-        DispatchQueue.main.asyncAfter(
-            deadline: .now() + viewModel.rackRespawnDelay,
-            execute: respawn
-        )
     }
 
     /// A potted (scratched) cue ball comes back to its spot.
     private func scheduleCueRespawn() {
         pendingCueRespawn?.cancel()
-        let respawn = DispatchWorkItem { [weak self] in
+        pendingCueRespawn = scheduleRespawn { [weak self] in
             self?.spawnCueBall()
         }
-        pendingCueRespawn = respawn
+    }
+
+    private func scheduleRespawn(_ work: @escaping () -> Void) -> DispatchWorkItem {
+        let respawn = DispatchWorkItem(block: work)
         DispatchQueue.main.asyncAfter(
             deadline: .now() + viewModel.rackRespawnDelay,
             execute: respawn
         )
+        return respawn
     }
 
     // MARK: - UICollisionBehaviorDelegate
@@ -680,15 +547,18 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
     // MARK: - Shattering
 
     /// A cell hit by a fast-enough cue ball doesn't just rock — it breaks.
+    /// The threshold compares against the velocity sampled a frame ago:
+    /// by the time beganContact fires the collision is already resolved
+    /// and the ball has bounced and slowed down.
     private func shatterIfSmashed(_ item: UIDynamicItem, by other: UIDynamicItem) {
         guard let target = item as? UIView,
-              targetBehaviors[target] != nil,
-              let ball = other as? BallView
+              targetSimulations[target] != nil,
+              other is BallView
         else { return }
 
-        let velocity = puckProperties.linearVelocity(for: ball)
-        guard hypot(velocity.x, velocity.y) > viewModel.shatterSpeedThreshold else { return }
-        shatter(target, ballVelocity: velocity)
+        let speed = hypot(lastCueVelocity.x, lastCueVelocity.y)
+        guard speed > viewModel.shatterSpeedThreshold else { return }
+        shatter(target, ballVelocity: lastCueVelocity)
     }
 
     /// The most screenshot-worthy moment: the cell splits into snapshot
@@ -697,7 +567,10 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
         guard let shards = makeShards(of: target) else { return }
 
         // The original leaves the simulation entirely.
-        targetBehaviors.removeValue(forKey: target)?.forEach { animator.removeBehavior($0) }
+        if let simulation = targetSimulations.removeValue(forKey: target) {
+            animator.removeBehavior(simulation.body)
+            animator.removeBehavior(simulation.spring)
+        }
         targetCollision?.removeItem(target)
         target.removeFromSuperview()
         Haptics.collision(intensity: 1)
@@ -806,7 +679,7 @@ private final class FeltBackgroundView: UIView {
 
 // Billiards-style slingshot: the puck flies opposite to the pull.
 // UIPushBehavior treats the vector's length as the force magnitude.
-let magnitude = min(pullDistance / 30, 8)
+let magnitude = min(pullDistance / 10, 24)
 let push = UIPushBehavior(items: [puck], mode: .instantaneous)
 push.pushDirection = CGVector(
     dx: (puck.center.x - finger.x) / pullDistance * magnitude,

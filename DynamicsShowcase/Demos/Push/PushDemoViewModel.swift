@@ -3,8 +3,10 @@ import UIKit
 /// Configuration and impulse math for the push demo.
 struct PushDemoViewModel {
 
-    /// The two faces of UIPushBehavior, plus the proof-of-concept mode
-    /// where the targets are ordinary UIButtons.
+    /// The two faces of UIPushBehavior, plus the "Real UI" mode where the
+    /// cue ball wrecks a fake settings screen of live UIKit views. The
+    /// segment titles are bare numbers to keep the control narrow; the
+    /// README names the modes.
     enum Mode: Int, CaseIterable {
         case impulse
         case continuous
