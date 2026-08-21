@@ -24,14 +24,6 @@ final class MenuViewController: UIViewController, UITableViewDataSource, UITable
         tableView.register(DemoCardCell.self, forCellReuseIdentifier: DemoCardCell.reuseIdentifier)
         tableView.contentInset = UIEdgeInsets(top: 8, left: 0, bottom: 24, right: 0)
 
-        let header = UILabel(frame: CGRect(x: 0, y: 0, width: view.bounds.width, height: 44))
-        header.text = viewModel.headerText
-        header.numberOfLines = 2
-        header.textAlignment = .center
-        header.font = UIFont.systemFont(ofSize: 14, weight: .medium).rounded()
-        header.textColor = UIColor.white.withAlphaComponent(0.55)
-        tableView.tableHeaderView = header
-
         view.addSubview(tableView)
     }
 

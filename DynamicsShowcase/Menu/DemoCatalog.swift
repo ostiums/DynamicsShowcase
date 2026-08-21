@@ -15,7 +15,7 @@ struct DemoDescriptor {
 enum DemoCatalog {
     static let all: [DemoDescriptor] = [
         DemoDescriptor(
-            emoji: "🌍",
+            emoji: "🍎",
             accentColor: Palette.cyan,
             title: "Gravity",
             apiSummary: "UIGravityBehavior · UICollisionBehavior",
@@ -29,14 +29,14 @@ enum DemoCatalog {
             makeViewController: { SnapDemoViewController() }
         ),
         DemoDescriptor(
-            emoji: "⛓️",
+            emoji: "🏗️",
             accentColor: Palette.violet,
             title: "Wrecking Ball",
             apiSummary: "UIAttachmentBehavior",
             makeViewController: { WreckingBallDemoViewController() }
         ),
         DemoDescriptor(
-            emoji: "🚀",
+            emoji: "🎱",
             accentColor: Palette.mint,
             title: "Push Impulses",
             apiSummary: "UIPushBehavior",
@@ -62,13 +62,6 @@ enum DemoCatalog {
             title: "Body Properties",
             apiSummary: "UIDynamicItemBehavior",
             makeViewController: { PropertiesDemoViewController() }
-        ),
-        DemoDescriptor(
-            emoji: "🎪",
-            accentColor: Palette.cyan,
-            title: "Playground",
-            apiSummary: "Everything + UIDynamicItemGroup",
-            makeViewController: { PlaygroundDemoViewController() }
         ),
         DemoDescriptor(
             emoji: "🎉",

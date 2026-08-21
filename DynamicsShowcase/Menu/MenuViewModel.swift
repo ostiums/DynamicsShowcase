@@ -3,7 +3,6 @@ import Foundation
 /// View model of the menu screen: the list of demos and the launch options.
 struct MenuViewModel {
     let title = "UIKit Dynamics"
-    let headerText = "A physics engine built right into UIKit.\nReal physics — no SpriteKit needed."
     let demos = DemoCatalog.all
 
     var demoCount: Int { demos.count }

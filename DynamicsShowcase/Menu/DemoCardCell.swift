@@ -37,7 +37,7 @@ final class DemoCardCell: UITableViewCell {
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         card.addSubview(titleLabel)
 
-        subtitleLabel.font = UIFont.monospacedSystemFont(ofSize: 11.5, weight: .medium)
+        subtitleLabel.font = UIFont.systemFont(ofSize: 12, weight: .medium)
         subtitleLabel.textColor = UIColor.white.withAlphaComponent(0.5)
         subtitleLabel.adjustsFontSizeToFitWidth = true
         subtitleLabel.minimumScaleFactor = 0.8
