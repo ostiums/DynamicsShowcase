@@ -68,13 +68,17 @@ enum FieldFactory {
             // dies out: resistance slows the particles, the force fades with the
             // speed, and the swarm freezes. A soft spring toward the field center
             // keeps the particles perpetually falling through it — and that motion
-            // is what the turbulence scatters into a boiling swarm.
+            // is what the turbulence scatters into a boiling swarm. A whisper of
+            // noise guarantees the velocities never damp all the way to zero,
+            // which would switch the whole loop off.
             let field = UIFieldBehavior.turbulenceField(smoothness: 0.4, animationSpeed: 6)
             field.strength = 4
             let hold = UIFieldBehavior.springField()
             hold.position = position
             hold.strength = 0.15
-            return [field, hold]
+            let stir = UIFieldBehavior.noiseField(smoothness: 0.4, animationSpeed: 1)
+            stir.strength = 0.15
+            return [field, hold, stir]
 
         case .velocity:
             // A local upward jet plus global gravity — a fountain.

@@ -16,7 +16,6 @@ final class GravityDemoViewController: DemoViewController, UICollisionBehaviorDe
     private var collision = UICollisionBehavior()
     private var ballProperties = UIDynamicItemBehavior()
     private var balls: [BallView] = []
-    private var pendingSpawns: [DispatchWorkItem] = []
 
     /// Unit direction of gravity, kept separately from the behavior:
     /// `gravityDirection` and `magnitude` are one and the same vector
@@ -66,7 +65,6 @@ final class GravityDemoViewController: DemoViewController, UICollisionBehaviorDe
 
     override func buildScene() {
         balls.removeAll()
-        cancelPendingSpawns()
 
         gravity = UIGravityBehavior()
         gravityUnitDirection = CGVector(dx: 0, dy: 1)
@@ -92,26 +90,16 @@ final class GravityDemoViewController: DemoViewController, UICollisionBehaviorDe
 
     // MARK: - Scene
 
-    /// Opening rain of balls — looks great from the first second of a recording.
-    /// The spawns are kept as work items so a reset can cancel the ones still
-    /// pending; otherwise they would rain into the scene that replaced them.
+    /// Opening rain of balls — looks great from the first second of a
+    /// recording. Scheduled via the base class, so a reset cancels the
+    /// spawns still pending instead of raining them into the new scene.
     private func scheduleOpeningRain() {
         for index in 0..<viewModel.initialBallCount {
-            let spawn = DispatchWorkItem { [weak self] in
+            schedule(after: Double(index) * viewModel.spawnInterval) { [weak self] in
                 guard let self else { return }
                 self.spawnBall(at: self.viewModel.rainSpawnPoint(in: self.view.bounds))
             }
-            pendingSpawns.append(spawn)
-            DispatchQueue.main.asyncAfter(
-                deadline: .now() + Double(index) * viewModel.spawnInterval,
-                execute: spawn
-            )
         }
-    }
-
-    private func cancelPendingSpawns() {
-        pendingSpawns.forEach { $0.cancel() }
-        pendingSpawns.removeAll()
     }
 
     private func spawnBall(at point: CGPoint) {

@@ -19,6 +19,9 @@ struct PaywallDemoViewModel {
 
     let title = "Start your 3-day FREE\ntrial to continue."
 
+    // All texts (dates included) are static recording props — the paywall
+    // is a fake built for the physics demo, nothing here is computed.
+
     let steps: [TimelineStep] = [
         TimelineStep(
             iconName: "lock.open.fill",
@@ -49,6 +52,15 @@ struct PaywallDemoViewModel {
     let buttonTitle = "Start My 3-Day Free Trial"
     let footnote = "3 days free, then $29.99 per year ($2.49/mo)"
     let greeting = "You're all set"
+
+    // Stacking metrics of the static layout; the drawing details (inner
+    // paddings, fonts) stay with the view code.
+    let contentMargin: CGFloat = 24
+    let titleHeight: CGFloat = 68
+    let timelineRowHeight: CGFloat = 74
+    let timelineRowSpacing: CGFloat = 10
+    let planCardHeight: CGFloat = 82
+    let ctaButtonHeight: CGFloat = 56
 
     // The collapse: how the paywall elements behave once they become
     // dynamic items. There is no collision behavior on purpose — the

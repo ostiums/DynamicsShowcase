@@ -12,8 +12,6 @@ final class PaywallDemoViewController: DemoViewController {
     /// Everything that will fall, in the order it appears on screen.
     private var elements: [UIView] = []
     private var collapsed = false
-    /// Kept as work items so a reset can cancel a celebration still pending.
-    private var pendingWork: [DispatchWorkItem] = []
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -25,9 +23,6 @@ final class PaywallDemoViewController: DemoViewController {
     override func buildScene() {
         elements.removeAll()
         collapsed = false
-        pendingWork.forEach { $0.cancel() }
-        pendingWork.removeAll()
-
         layoutPaywall()
     }
 
@@ -36,7 +31,7 @@ final class PaywallDemoViewController: DemoViewController {
     /// Lays the paywall out with plain frames — UIKit Dynamics moves items
     /// by center and transform, so the views must be frame-based.
     private func layoutPaywall() {
-        let margin: CGFloat = 24
+        let margin = viewModel.contentMargin
         let width = view.bounds.width - margin * 2
         var y = view.safeAreaInsets.top + 20
 
@@ -47,7 +42,7 @@ final class PaywallDemoViewController: DemoViewController {
         )
         title.numberOfLines = 2
         title.textAlignment = .center
-        title.frame = CGRect(x: margin, y: y, width: width, height: 68)
+        title.frame = CGRect(x: margin, y: y, width: width, height: viewModel.titleHeight)
         addElement(title)
         y = title.frame.maxY + 24
 
@@ -73,7 +68,7 @@ final class PaywallDemoViewController: DemoViewController {
         button.backgroundColor = .white
         button.layer.cornerRadius = 16
         button.layer.cornerCurve = .continuous
-        button.frame = CGRect(x: margin, y: y, width: width, height: 56)
+        button.frame = CGRect(x: margin, y: y, width: width, height: viewModel.ctaButtonHeight)
         button.addTarget(self, action: #selector(continueTapped), for: .touchUpInside)
         addElement(button)
         y = button.frame.maxY + 12
@@ -93,8 +88,8 @@ final class PaywallDemoViewController: DemoViewController {
     /// pieces burst apart far livelier than full-width row containers.
     /// Returns the bottom edge of the timeline.
     private func layoutTimeline(startY: CGFloat, margin: CGFloat, width: CGFloat) -> CGFloat {
-        let rowHeight: CGFloat = 74
-        let rowSpacing: CGFloat = 10
+        let rowHeight = viewModel.timelineRowHeight
+        let rowSpacing = viewModel.timelineRowSpacing
         let step = rowHeight + rowSpacing
 
         let line = UIView(frame: CGRect(
@@ -135,7 +130,7 @@ final class PaywallDemoViewController: DemoViewController {
     /// The two plan cards side by side. Returns their bottom edge.
     private func layoutPlanCards(startY: CGFloat, margin: CGFloat, width: CGFloat) -> CGFloat {
         let cardWidth = (width - 12) / 2
-        let cardHeight: CGFloat = 82
+        let cardHeight = viewModel.planCardHeight
         for (index, plan) in viewModel.plans.enumerated() {
             let card = makePlanCard(
                 plan,
@@ -288,14 +283,17 @@ final class PaywallDemoViewController: DemoViewController {
             )
         }
 
-        schedule(after: viewModel.celebrationDelay) { $0.celebrate() }
+        schedule(after: viewModel.celebrationDelay) { [weak self] in
+            self?.celebrate()
+        }
 
         // Once everything has left the screen, stop simulating it.
-        schedule(after: viewModel.cleanupDelay) {
-            $0.animator.removeBehavior(gravity)
-            $0.animator.removeBehavior(bodies)
-            $0.elements.forEach { $0.removeFromSuperview() }
-            $0.elements.removeAll()
+        schedule(after: viewModel.cleanupDelay) { [weak self] in
+            guard let self else { return }
+            self.animator.removeBehavior(gravity)
+            self.animator.removeBehavior(bodies)
+            self.elements.forEach { $0.removeFromSuperview() }
+            self.elements.removeAll()
         }
     }
 
@@ -348,7 +346,7 @@ final class PaywallDemoViewController: DemoViewController {
         emitter.beginTime = CACurrentMediaTime()
         contentView.layer.addSublayer(emitter)
 
-        schedule(after: viewModel.confettiDuration) { _ in
+        schedule(after: viewModel.confettiDuration) {
             // Stop the cannon; pieces already in the air finish their fall.
             emitter.birthRate = 0
         }
@@ -379,14 +377,6 @@ final class PaywallDemoViewController: DemoViewController {
         }
     }
 
-    private func schedule(after delay: TimeInterval, _ work: @escaping (PaywallDemoViewController) -> Void) {
-        let item = DispatchWorkItem { [weak self] in
-            guard let self else { return }
-            work(self)
-        }
-        pendingWork.append(item)
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: item)
-    }
 }
 
 // MARK: - Screenshot snippet
@@ -400,6 +390,7 @@ final class PaywallDemoViewController: DemoViewController {
 // and gravity carries it right off the screen.
 let gravity = UIGravityBehavior(items: paywallElements)
 let bodies = UIDynamicItemBehavior(items: paywallElements)
+bodies.allowsRotation = false  // the elements fall upright, no tumbling
 animator.addBehavior(gravity)
 animator.addBehavior(bodies)
 
@@ -411,9 +402,9 @@ for element in paywallElements {
 // The greeting drifts in on a damped spring — a snap slowed
 // down by resistance — while confetti falls.
 let snap = UISnapBehavior(item: greeting, snapTo: center)
-snap.damping = 0.65
+snap.damping = 0.85
 let drift = UIDynamicItemBehavior(items: [greeting])
-drift.resistance = 2.5
+drift.resistance = 3
 animator.addBehavior(snap)
 animator.addBehavior(drift)
 */

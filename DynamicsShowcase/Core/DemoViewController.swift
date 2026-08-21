@@ -10,6 +10,7 @@ class DemoViewController: UIViewController {
     lazy var animator = UIDynamicAnimator(referenceView: contentView)
 
     private var didBuildScene = false
+    private var pendingWork: [DispatchWorkItem] = []
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -47,10 +48,25 @@ class DemoViewController: UIViewController {
     /// Tears the scene down and builds it again. Bound to the reset button;
     /// demos that rebuild on their own (a mode switch, a replay tap) call it too.
     func resetScene() {
+        cancelPendingWork()
         animator.removeAllBehaviors()
         contentView.subviews.forEach { $0.removeFromSuperview() }
         contentView.layer.sublayers?.forEach { $0.removeFromSuperlayer() }
         buildScene()
+    }
+
+    /// Cancellable delayed work for scene events (spawn rains, celebrations,
+    /// debris sweeps). Every pending item is cancelled by the next reset,
+    /// so a stale closure never fires into a rebuilt scene.
+    func schedule(after delay: TimeInterval, _ work: @escaping () -> Void) {
+        let item = DispatchWorkItem(block: work)
+        pendingWork.append(item)
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: item)
+    }
+
+    private func cancelPendingWork() {
+        pendingWork.forEach { $0.cancel() }
+        pendingWork.removeAll()
     }
 
     /// Demo entry point. Called after layout and on every reset.
