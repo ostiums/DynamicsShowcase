@@ -687,12 +687,4 @@ push.pushDirection = CGVector(
 )
 push.setTargetOffsetFromCenter(grabOffset, for: cueBall)
 animator.addBehavior(push)
-
-// Mode 2: a .continuous force applied every frame, angle slowly rotating.
-continuousPush.angle += 0.02
-
-// Mode 3: every settings cell hangs on an invisible spring.
-let spring = UIAttachmentBehavior(item: cell, attachedToAnchor: home)
-spring.frequency = 2.2
-spring.damping = 0.55
 */
