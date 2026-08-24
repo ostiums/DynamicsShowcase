@@ -222,10 +222,9 @@ final class WreckingBallDemoViewController: DemoViewController, UICollisionBehav
     }
 }
 
-// MARK: - Screenshot snippet
+// MARK: - The gist
 //
 // The physics core of this screen, stripped of layout and styling.
-// This block goes on the code screenshot shown next to the recording.
 /*
 
 // The first ball hangs from a fixed point in space…

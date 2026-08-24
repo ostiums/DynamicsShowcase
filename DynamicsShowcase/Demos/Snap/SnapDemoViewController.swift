@@ -73,10 +73,9 @@ final class SnapDemoViewController: DemoViewController {
     }
 }
 
-// MARK: - Screenshot snippet
+// MARK: - The gist
 //
 // The physics core of this screen, stripped of layout and styling.
-// This block goes on the code screenshot shown next to the recording.
 /*
 
 // An item can have only one active snap,

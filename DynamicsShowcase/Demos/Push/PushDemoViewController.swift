@@ -671,10 +671,9 @@ private final class FeltBackgroundView: UIView {
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 }
 
-// MARK: - Screenshot snippet
+// MARK: - The gist
 //
 // The physics core of this screen, stripped of layout and styling.
-// This block goes on the code screenshot shown next to the recording.
 /*
 
 // Billiards slingshot: one instantaneous impulse. The vector's length
@@ -687,4 +686,16 @@ push.pushDirection = CGVector(
 )
 push.setTargetOffsetFromCenter(grabOffset, for: cueBall)
 animator.addBehavior(push)
+
+// Everything after the shot is one UICollisionBehavior: balls, walls
+// and the settings cells collide, and UIKit resolves the impacts,
+// masses and bounces on its own.
+collision.addItem(ball)
+
+// A pocket isn't physics: a ball that reaches one just leaves
+// the simulation.
+collision.removeItem(pottedBall)
+
+// The settings cells rock and come back home on invisible springs.
+animator.addBehavior(UIAttachmentBehavior(item: cell, attachedToAnchor: home))
 */
