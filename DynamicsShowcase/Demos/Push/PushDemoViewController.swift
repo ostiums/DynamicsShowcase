@@ -679,6 +679,11 @@ private final class FeltBackgroundView: UIView {
 // The physics engine lives in one object:
 let animator = UIDynamicAnimator(referenceView: view)
 
+// The settings screen: every cell is a plain UIView that became a
+// dynamic item. Each hangs on an invisible spring that rocks it and
+// pulls it back home after a hit.
+animator.addBehavior(UIAttachmentBehavior(item: cell, attachedToAnchor: home))
+
 // The table: every ball in this behavior bounces off the walls and
 // off the other balls — UIKit resolves the impacts on its own.
 let collision = UICollisionBehavior(items: balls)
@@ -701,7 +706,4 @@ animator.addBehavior(push)
 
 // A pocket isn't physics: a potted ball just leaves the simulation.
 collision.removeItem(pottedBall)
-
-// The settings cells rock and come back home on invisible springs.
-animator.addBehavior(UIAttachmentBehavior(item: cell, attachedToAnchor: home))
 */
