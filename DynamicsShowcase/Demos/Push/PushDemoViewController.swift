@@ -676,9 +676,21 @@ private final class FeltBackgroundView: UIView {
 // The physics core of this screen, stripped of layout and styling.
 /*
 
-// Billiards slingshot: one instantaneous impulse. The vector's length
-// is the force, its direction — opposite to the pull. An off-center
-// grab adds spin, like a cue striking off-center.
+// The physics engine lives in one object:
+let animator = UIDynamicAnimator(referenceView: view)
+
+// The table: every ball in this behavior bounces off the walls and
+// off the other balls — UIKit resolves the impacts on its own.
+let collision = UICollisionBehavior(items: balls)
+collision.addBoundary(
+    withIdentifier: "table" as NSString,
+    for: UIBezierPath(rect: tableRect)
+)
+animator.addBehavior(collision)
+
+// The shot: one instantaneous impulse. The vector's length is the
+// force, its direction — opposite to the pull. An off-center grab
+// adds spin, like a cue striking off-center.
 let push = UIPushBehavior(items: [cueBall], mode: .instantaneous)
 push.pushDirection = CGVector(
     dx: (cueBall.center.x - finger.x) / 10,
@@ -687,13 +699,7 @@ push.pushDirection = CGVector(
 push.setTargetOffsetFromCenter(grabOffset, for: cueBall)
 animator.addBehavior(push)
 
-// Everything after the shot is one UICollisionBehavior: balls, walls
-// and the settings cells collide, and UIKit resolves the impacts,
-// masses and bounces on its own.
-collision.addItem(ball)
-
-// A pocket isn't physics: a ball that reaches one just leaves
-// the simulation.
+// A pocket isn't physics: a potted ball just leaves the simulation.
 collision.removeItem(pottedBall)
 
 // The settings cells rock and come back home on invisible springs.
