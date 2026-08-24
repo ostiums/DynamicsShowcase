@@ -681,7 +681,10 @@ private final class FeltBackgroundView: UIView {
 // is the force, its direction — opposite to the pull. An off-center
 // grab adds spin, like a cue striking off-center.
 let push = UIPushBehavior(items: [cueBall], mode: .instantaneous)
-push.pushDirection = impulse
+push.pushDirection = CGVector(
+    dx: (cueBall.center.x - finger.x) / 10,
+    dy: (cueBall.center.y - finger.y) / 10
+)
 push.setTargetOffsetFromCenter(grabOffset, for: cueBall)
 animator.addBehavior(push)
 
