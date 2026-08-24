@@ -677,34 +677,19 @@ private final class FeltBackgroundView: UIView {
 // This block goes on the code screenshot shown next to the recording.
 /*
 
-// Billiards-style slingshot: the cue ball flies opposite to the pull.
-// UIPushBehavior treats the vector's length as the force magnitude.
-let magnitude = min(pullDistance / 10, 24)
+// Billiards slingshot: one instantaneous impulse. The vector's length
+// is the force, its direction — opposite to the pull. An off-center
+// grab adds spin, like a cue striking off-center.
 let push = UIPushBehavior(items: [cueBall], mode: .instantaneous)
-push.pushDirection = CGVector(
-    dx: (cueBall.center.x - finger.x) / pullDistance * magnitude,
-    dy: (cueBall.center.y - finger.y) / pullDistance * magnitude
-)
-
-// Grabbing off-center spins the ball — a cue striking off-center.
+push.pushDirection = impulse
 push.setTargetOffsetFromCenter(grabOffset, for: cueBall)
 animator.addBehavior(push)
 
-// A potted ball simply leaves the simulation.
-collision.removeItem(pottedBall)
-
-// Mode 2, .continuous, applies the force every frame; slowly
-// rotating its angle swirls all the balls around the table.
+// Mode 2: a .continuous force applied every frame, angle slowly rotating.
 continuousPush.angle += 0.02
 
-// Mode 3: every settings cell hangs on an invisible spring —
-// a hit rocks it, jelly-like, and it snaps back home.
+// Mode 3: every settings cell hangs on an invisible spring.
 let spring = UIAttachmentBehavior(item: cell, attachedToAnchor: home)
-spring.length = 0
 spring.frequency = 2.2
 spring.damping = 0.55
-
-// Mass honesty sells the effect: density grows with the cell's
-// area, so small cells fly and the big profile cell barely budges.
-body.density = cellArea / 12_000
 */
