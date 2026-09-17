@@ -2,25 +2,50 @@ import UIKit
 
 /// Demonstrates UIAttachmentBehavior.
 ///
-/// - The first ball hangs from an anchor point: `UIAttachmentBehavior(item:attachedToAnchor:)`.
-/// - The rest are linked to each other: `UIAttachmentBehavior(item:attachedTo:)`.
-///   Both are rigid links: the length is fixed at the distance between the
-///   items at the moment the attachment is created.
+/// - The ball hangs from an anchor point: `UIAttachmentBehavior(item:attachedToAnchor:)`,
+///   a rigid link whose `length` fixes the ball's reach. An attachment is a
+///   rod, not a rope — it resists compression too — so the cable is only
+///   attached while it is under tension; see `updateCable`.
 /// - Dragging works through one more attachment whose `anchorPoint`
-///   follows the finger.
-/// - The dense wrecking ball at the end of the chain smashes a tower of
-///   blocks standing on a pedestal (a line boundary of the collision behavior).
+///   follows the finger; letting go throws the ball with the finger's
+///   velocity, so a flick toward the wall is the shot.
+/// - The dense wrecking ball smashes a wall of bricks standing on a
+///   pedestal (a line boundary of the collision behavior). Every brick
+///   carries a word, the ball carries the answer.
+/// - A hard enough hit doesn't just topple a brick: it shatters it into
+///   snapshot shards, sends a shockwave out of the contact point and
+///   shakes the screen. Once the pedestal is cleared the payoff line drops
+///   in on a `UISnapBehavior` and the wall stands back up for another go.
 final class WreckingBallDemoViewController: DemoViewController, UICollisionBehaviorDelegate {
 
     private let viewModel = WreckingBallDemoViewModel()
 
-    private var chain: [BallView] = []
+    private var wreckingBall: BallView?
+    private var bricks: [BrickView] = []
+    /// Where each brick was laid — the reference for "still standing".
+    private var brickHomes: [BrickView: CGPoint] = [:]
     private var gravity = UIGravityBehavior()
     private var collision = UICollisionBehavior()
+    private var ballProperties = UIDynamicItemBehavior()
+    private var brickProperties = UIDynamicItemBehavior()
     private var dragAttachment: UIAttachmentBehavior?
+    /// The ball's cable to the anchor; see `attachCableIfTaut`.
+    private var cable: UIAttachmentBehavior?
+    private var wallLayout: WreckingBallDemoViewModel.WallLayout?
 
-    /// Draws the rope between the anchor and the balls, beneath them.
-    private let linkLayer: CAShapeLayer = {
+    /// The wrecking ball's velocity sampled one frame before a contact —
+    /// beganContact fires after the collision is resolved, when the ball
+    /// has already bounced and slowed down.
+    private var lastBallVelocity: CGPoint = .zero
+    private var wallCleared = false
+    /// Set once the payoff has had its moment; the rebuild itself waits for
+    /// the ball to swing clear of the pedestal.
+    private var rebuildPending = false
+    private var payoffLabel: UILabel?
+    private var payoffBehaviors: [UIDynamicBehavior] = []
+
+    /// Draws the cable between the anchor and the ball, beneath it.
+    private let cableLayer: CAShapeLayer = {
         let layer = CAShapeLayer()
         layer.strokeColor = UIColor.white.withAlphaComponent(0.35).cgColor
         layer.lineWidth = 2.5
@@ -29,10 +54,14 @@ final class WreckingBallDemoViewController: DemoViewController, UICollisionBehav
         return layer
     }()
 
+    /// Ghost dots trailing the wrecking ball, oldest first.
+    private var trailDots: [CALayer] = []
+    private var trailPoints: [CGPoint] = []
+
     private var displayLink: CADisplayLink?
 
     private var anchorPoint: CGPoint {
-        CGPoint(x: view.bounds.midX, y: view.safeAreaLayoutGuide.layoutFrame.minY + 60)
+        viewModel.anchorPoint(in: view.bounds, safeTop: view.safeAreaLayoutGuide.layoutFrame.minY)
     }
 
     // MARK: - Lifecycle
@@ -43,9 +72,9 @@ final class WreckingBallDemoViewController: DemoViewController, UICollisionBehav
         view.addGestureRecognizer(UIPanGestureRecognizer(target: self, action: #selector(handlePan)))
     }
 
-    // The link that redraws the chain runs only while the screen is visible.
-    // A CADisplayLink retains its target, so one that lived as long as the
-    // controller would keep the controller alive forever — deinit would never run.
+    // The per-frame tick (cable, trail, velocity sampling) runs only while the
+    // screen is visible. A CADisplayLink retains its target, so one that lived
+    // as long as the controller would keep the controller alive forever.
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         startDisplayLink()
@@ -58,7 +87,7 @@ final class WreckingBallDemoViewController: DemoViewController, UICollisionBehav
 
     private func startDisplayLink() {
         stopDisplayLink()
-        let link = CADisplayLink(target: self, selector: #selector(redrawLinks))
+        let link = CADisplayLink(target: self, selector: #selector(tick))
         link.add(to: .main, forMode: .common)
         displayLink = link
     }
@@ -69,23 +98,96 @@ final class WreckingBallDemoViewController: DemoViewController, UICollisionBehav
     }
 
     override func buildScene() {
-        chain.removeAll()
+        wreckingBall = nil
+        bricks.removeAll()
+        brickHomes.removeAll()
+        trailPoints.removeAll()
+        lastBallVelocity = .zero
+        wallCleared = false
+        rebuildPending = false
+        payoffLabel = nil
+        payoffBehaviors.removeAll()
+        dragAttachment = nil
+        cable = nil
 
         gravity = UIGravityBehavior()
         collision = UICollisionBehavior()
-        collision.translatesReferenceBoundsIntoBoundary = true
+        // No screen edges, deliberately: the pedestal is the only boundary.
+        // Bricks knocked off it fly out of the picture instead of piling up
+        // against an immovable wall, where a heavy ball wedged into the pile
+        // would get squeezed off its arc by the collision solver. The ball
+        // itself is kept on screen by its cable.
         collision.collisionDelegate = self
         animator.addBehavior(gravity)
         animator.addBehavior(collision)
 
-        // Added first so the balls drawn afterwards cover the rope ends.
-        contentView.layer.addSublayer(linkLayer)
+        ballProperties = UIDynamicItemBehavior()
+        ballProperties.elasticity = viewModel.ballElasticity
+        ballProperties.resistance = viewModel.ballResistance
+        ballProperties.angularResistance = viewModel.ballAngularResistance
+        ballProperties.density = viewModel.wreckingBallDensity
+        // A slick ball: bricks that land on it slide off instead of riding
+        // along on top of it through the next swing.
+        ballProperties.friction = 0
+        animator.addBehavior(ballProperties)
+
+        brickProperties = UIDynamicItemBehavior()
+        brickProperties.density = viewModel.brickDensity
+        brickProperties.friction = viewModel.brickFriction
+        brickProperties.elasticity = viewModel.brickElasticity
+        animator.addBehavior(brickProperties)
+
+        // Added first so the views drawn afterwards cover the cable and the trail.
+        addTrail()
+        contentView.layer.addSublayer(cableLayer)
 
         addAnchorDot()
 
-        let layout = viewModel.chainLayout(anchor: anchorPoint)
-        buildTower(chainLength: layout.length)
-        buildChain(with: layout)
+        let wallLayout = viewModel.wallLayout(in: view.bounds)
+        self.wallLayout = wallLayout
+        addPlatform(wallLayout)
+        spawnWall(animated: false)
+        addBall()
+        updateCable()
+    }
+
+    /// The cable is an attachment to the anchor with a fixed `length` — and
+    /// an attachment is a rod, not a rope: it resists compression as much
+    /// as stretching, and would hold the ball up above the anchor. A real
+    /// cable goes slack, so the attachment is only present while it pulls:
+    /// it comes off for a drag (the ball must follow the finger inside the
+    /// arc freely) and whenever the tension drops to zero, and goes back on
+    /// the moment the ball reaches its full reach heading outward.
+    private func updateCable() {
+        guard dragAttachment == nil, let wreckingBall else { return }
+
+        if cable != nil {
+            if !viewModel.isCableUnderTension(
+                ballCenter: wreckingBall.center,
+                velocity: lastBallVelocity,
+                anchor: anchorPoint
+            ) {
+                detachCable()
+            }
+            return
+        }
+
+        guard viewModel.shouldAttachCable(
+            ballCenter: wreckingBall.center,
+            velocity: lastBallVelocity,
+            anchor: anchorPoint
+        ) else { return }
+
+        let cable = UIAttachmentBehavior(item: wreckingBall, attachedToAnchor: anchorPoint)
+        cable.length = viewModel.cableLength
+        animator.addBehavior(cable)
+        self.cable = cable
+    }
+
+    private func detachCable() {
+        guard let cable else { return }
+        animator.removeBehavior(cable)
+        self.cable = nil
     }
 
     // MARK: - Scene
@@ -102,49 +204,38 @@ final class WreckingBallDemoViewController: DemoViewController, UICollisionBehav
         contentView.addSubview(dot)
     }
 
-    private func buildChain(with layout: WreckingBallDemoViewModel.ChainLayout) {
-        let chainProperties = UIDynamicItemBehavior()
-        chainProperties.elasticity = viewModel.chainElasticity
-        chainProperties.resistance = viewModel.chainResistance
-        chainProperties.angularResistance = viewModel.chainAngularResistance
-        animator.addBehavior(chainProperties)
-
-        var previous: BallView?
-        for (index, link) in viewModel.chainBalls.enumerated() {
-            let ball = BallView(diameter: link.diameter, color: link.color)
-            ball.center = layout.ballCenter(at: index, anchor: anchorPoint)
-            contentView.addSubview(ball)
-            chain.append(ball)
-
-            gravity.addItem(ball)
-            collision.addItem(ball)
-            chainProperties.addItem(ball)
-
-            if let previous {
-                // Item-to-item link; its length is fixed at the current distance.
-                animator.addBehavior(UIAttachmentBehavior(item: ball, attachedTo: previous))
-            } else {
-                // The first ball hangs from the anchor point.
-                animator.addBehavior(UIAttachmentBehavior(item: ball, attachedToAnchor: anchorPoint))
-            }
-            previous = ball
+    private func addTrail() {
+        trailDots = (0..<viewModel.trailLength).map { index in
+            let progress = CGFloat(index) / CGFloat(max(1, viewModel.trailLength - 1))
+            let diameter = viewModel.wreckingBallDiameter * (0.15 + 0.7 * progress)
+            let dot = CALayer()
+            dot.bounds = CGRect(x: 0, y: 0, width: diameter, height: diameter)
+            dot.cornerRadius = diameter / 2
+            dot.backgroundColor = viewModel.wreckingBallColor
+                .withAlphaComponent(0.04 + 0.28 * progress).cgColor
+            dot.isHidden = true
+            contentView.layer.addSublayer(dot)
+            return dot
         }
-
-        guard let wreckingBall = chain.last else { return }
-
-        let ballProperties = UIDynamicItemBehavior(items: [wreckingBall])
-        ballProperties.density = viewModel.wreckingBallDensity
-        animator.addBehavior(ballProperties)
     }
 
-    private func buildTower(chainLength: CGFloat) {
-        let layout = viewModel.towerLayout(
-            anchor: anchorPoint,
-            chainLength: chainLength,
-            in: view.bounds
+    private func addBall() {
+        let ball = BallView(
+            diameter: viewModel.wreckingBallDiameter,
+            color: viewModel.wreckingBallColor,
+            label: viewModel.ballLabel
         )
+        ball.center = viewModel.restPoint(anchor: anchorPoint)
+        contentView.addSubview(ball)
+        wreckingBall = ball
 
-        // The pedestal is a line boundary; blocks rest on it until hit.
+        gravity.addItem(ball)
+        collision.addItem(ball)
+        ballProperties.addItem(ball)
+    }
+
+    private func addPlatform(_ layout: WreckingBallDemoViewModel.WallLayout) {
+        // The pedestal is a line boundary; bricks rest on it until hit.
         collision.addBoundary(
             withIdentifier: "platform" as NSString,
             from: layout.platformStart,
@@ -154,21 +245,72 @@ final class WreckingBallDemoViewController: DemoViewController, UICollisionBehav
             from: layout.platformStart,
             to: layout.platformEnd
         ))
+    }
 
-        let blockProperties = UIDynamicItemBehavior()
-        blockProperties.density = viewModel.blockDensity
-        blockProperties.friction = viewModel.blockFriction
-        blockProperties.elasticity = viewModel.blockElasticity
-        animator.addBehavior(blockProperties)
+    /// Lays the bricks. Animated, they drop in from above the screen row by
+    /// row and join the simulation only once they have landed — the rebuild
+    /// after a cleared wall.
+    private func spawnWall(animated: Bool) {
+        guard let wallLayout else { return }
+        let words = viewModel.bricks
 
-        for center in layout.blockCenters {
-            let block = BoxView(size: viewModel.blockSize, color: Palette.coral)
-            block.center = center
-            contentView.addSubview(block)
-            gravity.addItem(block)
-            collision.addItem(block)
-            blockProperties.addItem(block)
+        for (index, center) in wallLayout.brickCenters.enumerated() {
+            let row = index / viewModel.wallColumns
+            let brick = BrickView(
+                size: viewModel.brickSize,
+                color: viewModel.brickColor(forRow: row),
+                text: words[index % words.count]
+            )
+            brick.center = center
+            if let wreckingBall {
+                contentView.insertSubview(brick, belowSubview: wreckingBall)
+            } else {
+                contentView.addSubview(brick)
+            }
+            bricks.append(brick)
+            brickHomes[brick] = center
+
+            guard animated else {
+                addToSimulation(brick)
+                continue
+            }
+
+            let delay = viewModel.brickDropRowStagger * Double(row)
+            brick.center.y = -viewModel.brickSize.height
+            brick.alpha = 0
+            UIView.animate(
+                withDuration: viewModel.brickDropDuration,
+                delay: delay,
+                usingSpringWithDamping: 0.75,
+                initialSpringVelocity: 0.4
+            ) {
+                brick.center = center
+                brick.alpha = 1
+            }
+            schedule(after: delay + viewModel.brickDropDuration) { [weak self] in
+                self?.addToSimulation(brick)
+            }
         }
+    }
+
+    private func addToSimulation(_ brick: BrickView) {
+        gravity.addItem(brick)
+        collision.addItem(brick)
+        brickProperties.addItem(brick)
+    }
+
+    private func removeFromSimulation(_ brick: BrickView) {
+        gravity.removeItem(brick)
+        collision.removeItem(brick)
+        brickProperties.removeItem(brick)
+    }
+
+    /// Takes a brick out of the scene entirely.
+    private func discard(_ brick: BrickView) {
+        removeFromSimulation(brick)
+        bricks.removeAll { $0 === brick }
+        brickHomes[brick] = nil
+        brick.removeFromSuperview()
     }
 
     // MARK: - Gestures
@@ -178,36 +320,114 @@ final class WreckingBallDemoViewController: DemoViewController, UICollisionBehav
 
         switch pan.state {
         case .began:
-            guard let ball = chain.nearest(to: location, within: viewModel.grabRadius) else { return }
-            let attachment = UIAttachmentBehavior(item: ball, attachedToAnchor: location)
-            animator.addBehavior(attachment)
-            dragAttachment = attachment
+            guard let wreckingBall,
+                  hypot(wreckingBall.center.x - location.x, wreckingBall.center.y - location.y)
+                    < viewModel.grabRadius
+            else { return }
+            beginDrag(of: wreckingBall, at: location)
             Haptics.action()
 
         case .changed:
             dragAttachment?.anchorPoint = location
 
         default:
-            if let dragAttachment {
-                animator.removeBehavior(dragAttachment)
-                self.dragAttachment = nil
-            }
+            endDrag(throwVelocity: pan.velocity(in: contentView))
         }
     }
 
-    // MARK: - Link drawing
+    private func beginDrag(of ball: BallView, at location: CGPoint) {
+        detachCable()
+        let attachment = UIAttachmentBehavior(item: ball, attachedToAnchor: location)
+        animator.addBehavior(attachment)
+        dragAttachment = attachment
+    }
 
-    @objc private func redrawLinks() {
-        guard !chain.isEmpty else {
-            linkLayer.path = nil
+    /// Letting go throws the ball with the finger's velocity. The drag
+    /// attachment can't be trusted to leave that velocity behind: a rigid
+    /// joint to a finger that has stopped moving for even one frame brings
+    /// the ball to a halt, so whether a flick "took" would depend on which
+    /// frame the touch ended in.
+    private func endDrag(throwVelocity: CGPoint) {
+        guard let dragAttachment, let wreckingBall else { return }
+        animator.removeBehavior(dragAttachment)
+        self.dragAttachment = nil
+
+        let throwing = viewModel.throwVelocity(fromGesture: throwVelocity)
+        let current = ballProperties.linearVelocity(for: wreckingBall)
+        ballProperties.addLinearVelocity(
+            CGPoint(x: throwing.x - current.x, y: throwing.y - current.y),
+            for: wreckingBall
+        )
+    }
+
+    // MARK: - Every frame
+
+    @objc private func tick() {
+        drawCable()
+        guard let wreckingBall else { return }
+
+        lastBallVelocity = ballProperties.linearVelocity(for: wreckingBall)
+        updateTrail(with: wreckingBall.center)
+        updateCable()
+
+        // Bricks that flew off the screen are gone; keep the simulation lean.
+        for brick in bricks where viewModel.isOffScreen(brickCenter: brick.center, in: view.bounds) {
+            discard(brick)
+        }
+
+        // The wall is down once nothing is left standing — rubble on the
+        // pedestal doesn't count, the rebuild sweeps it away.
+        let standing = bricks.contains { brick in
+            guard let home = brickHomes[brick] else { return false }
+            return viewModel.isStanding(
+                brickCenter: brick.center,
+                rotation: atan2(brick.transform.b, brick.transform.a),
+                home: home
+            )
+        }
+        if !wallCleared, !standing {
+            wallCleared = true
+            celebrate()
+        }
+
+        if rebuildPending, let wallLayout, viewModel.isBallClear(
+            ballCenter: wreckingBall.center,
+            velocity: lastBallVelocity,
+            layout: wallLayout
+        ) {
+            rebuildPending = false
+            rebuildWall()
+        }
+    }
+
+    private func drawCable() {
+        guard let wreckingBall else {
+            cableLayer.path = nil
             return
         }
         let path = UIBezierPath()
         path.move(to: anchorPoint)
-        for ball in chain {
-            path.addLine(to: ball.center)
+        path.addLine(to: wreckingBall.center)
+        cableLayer.path = path.cgPath
+    }
+
+    private func updateTrail(with point: CGPoint) {
+        trailPoints.append(point)
+        if trailPoints.count > trailDots.count {
+            trailPoints.removeFirst(trailPoints.count - trailDots.count)
         }
-        linkLayer.path = path.cgPath
+        // Positions are set every frame; implicit animations would only lag behind.
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        let offset = trailDots.count - trailPoints.count
+        for (index, dot) in trailDots.enumerated() {
+            let pointIndex = index - offset
+            dot.isHidden = pointIndex < 0
+            if pointIndex >= 0 {
+                dot.position = trailPoints[pointIndex]
+            }
+        }
+        CATransaction.commit()
     }
 
     // MARK: - UICollisionBehaviorDelegate
@@ -219,34 +439,175 @@ final class WreckingBallDemoViewController: DemoViewController, UICollisionBehav
         at p: CGPoint
     ) {
         reactToContact(item1, item2, intensity: 0.5)
+        if let brick = item1 as? BrickView, item2 === wreckingBall {
+            brickHit(brick, at: p)
+        } else if let brick = item2 as? BrickView, item1 === wreckingBall {
+            brickHit(brick, at: p)
+        }
+    }
+
+    func collisionBehavior(
+        _ behavior: UICollisionBehavior,
+        beganContactFor item: UIDynamicItem,
+        withBoundaryIdentifier identifier: NSCopying?,
+        at p: CGPoint
+    ) {
+        reactToContact(item, intensity: 0.3)
+    }
+
+    /// The wrecking ball has hit a brick: a light touch rocks it, a hard
+    /// one breaks it — with the whole screen feeling the impact.
+    private func brickHit(_ brick: BrickView, at point: CGPoint) {
+        brick.squash()
+
+        let speed = hypot(lastBallVelocity.x, lastBallVelocity.y)
+        guard speed > viewModel.shatterSpeedThreshold else { return }
+
+        shatter(brick)
+        shockwave(at: point)
+        shakeScreen()
+        Haptics.collision(intensity: 1)
+    }
+
+    // MARK: - Impact effects
+
+    /// The brick splits into snapshot shards that burst away from its
+    /// center, keep some of the ball's momentum and rain out of the screen.
+    /// They collide with nothing, so the wall isn't disturbed by its own debris.
+    private func shatter(_ brick: BrickView) {
+        guard let shards = brick.makeShards(in: contentView, columns: 4, rows: 2) else { return }
+        let origin = brick.center
+        discard(brick)
+
+        let debris = UIDynamicItemBehavior(items: shards)
+        debris.resistance = viewModel.shardResistance
+        let fall = UIGravityBehavior(items: shards)
+        animator.addBehavior(debris)
+        animator.addBehavior(fall)
+
+        for shard in shards {
+            let dx = shard.center.x - origin.x
+            let dy = shard.center.y - origin.y
+            let radial = max(1, hypot(dx, dy))
+            let burst = CGFloat.random(in: viewModel.shardBurstSpeed)
+            debris.addLinearVelocity(
+                CGPoint(
+                    x: dx / radial * burst + lastBallVelocity.x * 0.4,
+                    y: dy / radial * burst + lastBallVelocity.y * 0.4
+                ),
+                for: shard
+            )
+            debris.addAngularVelocity(.random(in: viewModel.shardSpinRange), for: shard)
+        }
+
+        // Sweep the debris once it has fallen off the screen.
+        schedule(after: viewModel.shardCleanupDelay) { [weak self] in
+            guard let self else { return }
+            self.animator.removeBehavior(debris)
+            self.animator.removeBehavior(fall)
+            shards.forEach { $0.removeFromSuperview() }
+        }
+    }
+
+    /// A white ring expanding out of the contact point.
+    private func shockwave(at point: CGPoint) {
+        let radius: CGFloat = 70
+        let ring = CAShapeLayer()
+        ring.bounds = CGRect(x: 0, y: 0, width: radius * 2, height: radius * 2)
+        ring.position = point
+        ring.path = UIBezierPath(ovalIn: ring.bounds).cgPath
+        ring.strokeColor = UIColor.white.cgColor
+        ring.fillColor = nil
+        ring.lineWidth = 3
+        ring.opacity = 0
+        contentView.layer.addSublayer(ring)
+
+        let scale = CABasicAnimation(keyPath: "transform.scale")
+        scale.fromValue = 0.15
+        scale.toValue = 1
+        let fade = CABasicAnimation(keyPath: "opacity")
+        fade.fromValue = 0.9
+        fade.toValue = 0
+        let group = CAAnimationGroup()
+        group.animations = [scale, fade]
+        group.duration = 0.45
+        group.timingFunction = CAMediaTimingFunction(name: .easeOut)
+
+        CATransaction.begin()
+        CATransaction.setCompletionBlock { ring.removeFromSuperlayer() }
+        ring.add(group, forKey: "shockwave")
+        CATransaction.commit()
+    }
+
+    /// The whole screen jolts on a hard hit. Additive translation on the
+    /// presentation layer only: nothing the animator tracks is touched.
+    private func shakeScreen() {
+        let shakeX = CAKeyframeAnimation(keyPath: "transform.translation.x")
+        shakeX.values = [0, 7, -6, 4, -2, 0]
+        let shakeY = CAKeyframeAnimation(keyPath: "transform.translation.y")
+        shakeY.values = [0, -4, 3, -2, 1, 0]
+        for shake in [shakeX, shakeY] {
+            shake.duration = 0.28
+            shake.isAdditive = true
+        }
+        view.layer.add(shakeX, forKey: "shakeX")
+        view.layer.add(shakeY, forKey: "shakeY")
+    }
+
+    // MARK: - Payoff and rebuild
+
+    /// The pedestal is clear: the payoff line drops in, then the wall stands
+    /// back up so the swing can go on without touching the reset button.
+    private func celebrate() {
+        guard let wallLayout else { return }
+        Haptics.action()
+
+        let label = UILabel()
+        label.text = viewModel.payoff
+        label.font = UIFont.systemFont(ofSize: 40, weight: .black).rounded()
+        label.textColor = .white
+        label.textAlignment = .center
+        label.sizeToFit()
+        label.layer.shadowColor = Palette.amber.cgColor
+        label.layer.shadowOpacity = 0.6
+        label.layer.shadowRadius = 10
+        label.layer.shadowOffset = .zero
+        let target = viewModel.payoffPoint(in: view.bounds, layout: wallLayout)
+        label.center = CGPoint(x: target.x, y: -60)
+        contentView.addSubview(label)
+        payoffLabel = label
+
+        // No gravity on the label — the snap alone pulls it in, and the
+        // resistance turns the arrival from a slam into a drift.
+        let snap = UISnapBehavior(item: label, snapTo: target)
+        snap.damping = viewModel.payoffSnapDamping
+        let drift = UIDynamicItemBehavior(items: [label])
+        drift.resistance = viewModel.payoffResistance
+        animator.addBehavior(snap)
+        animator.addBehavior(drift)
+        payoffBehaviors = [snap, drift]
+
+        schedule(after: viewModel.rebuildDelay) { [weak self] in
+            self?.rebuildPending = true
+        }
+    }
+
+    private func rebuildWall() {
+        payoffBehaviors.forEach { animator.removeBehavior($0) }
+        payoffBehaviors.removeAll()
+        if let payoffLabel {
+            UIView.animate(withDuration: 0.3, animations: {
+                payoffLabel.alpha = 0
+            }, completion: { _ in
+                payoffLabel.removeFromSuperview()
+            })
+            self.payoffLabel = nil
+        }
+
+        // Whatever is left of the old wall is swept away.
+        bricks.forEach(discard)
+
+        spawnWall(animated: true)
+        wallCleared = false
     }
 }
-
-// MARK: - The gist
-//
-// The physics core of this screen, stripped of layout and styling.
-/*
-
-// The first ball hangs from a fixed point in space…
-animator.addBehavior(UIAttachmentBehavior(
-    item: balls[0],
-    attachedToAnchor: anchor
-))
-
-// …the rest are linked to each other. Both attachments are rigid:
-// the length locks at the distance between the items at creation time.
-for (ball, previous) in zip(balls.dropFirst(), balls) {
-    animator.addBehavior(UIAttachmentBehavior(
-        item: ball,
-        attachedTo: previous
-    ))
-}
-
-// The last ball is much denser — that's what carries the momentum.
-let wreckingBall = UIDynamicItemBehavior(items: [balls.last!])
-wreckingBall.density = 2.5
-animator.addBehavior(wreckingBall)
-
-// Dragging is one more attachment whose anchor follows the finger.
-dragAttachment.anchorPoint = pan.location(in: view)
-*/

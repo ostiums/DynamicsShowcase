@@ -564,7 +564,11 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
     /// The most screenshot-worthy moment: the cell splits into snapshot
     /// shards that spin away, rain down and get swept up afterwards.
     private func shatter(_ target: UIView, ballVelocity: CGPoint) {
-        guard let shards = makeShards(of: target) else { return }
+        guard let shards = target.makeShards(
+            in: contentView,
+            columns: target.bounds.width > 200 ? 3 : 2,
+            rows: 2
+        ) else { return }
 
         // The original leaves the simulation entirely.
         if let simulation = targetSimulations.removeValue(forKey: target) {
@@ -609,39 +613,6 @@ final class PushDemoViewController: DemoViewController, UICollisionBehaviorDeleg
             deadline: .now() + viewModel.shardCleanupDelay,
             execute: cleanup
         )
-    }
-
-    /// Slices the cell's live snapshot into a grid of 4–6 pieces.
-    private func makeShards(of target: UIView) -> [UIView]? {
-        let size = target.bounds.size
-        guard size.width > 1, size.height > 1 else { return nil }
-
-        let columns = size.width > 200 ? 3 : 2
-        let rows = 2
-        let pieceWidth = size.width / CGFloat(columns)
-        let pieceHeight = size.height / CGFloat(rows)
-
-        var shards: [UIView] = []
-        for row in 0..<rows {
-            for column in 0..<columns {
-                let rect = CGRect(
-                    x: CGFloat(column) * pieceWidth,
-                    y: CGFloat(row) * pieceHeight,
-                    width: pieceWidth,
-                    height: pieceHeight
-                )
-                guard let shard = target.resizableSnapshotView(
-                    from: rect,
-                    afterScreenUpdates: false,
-                    withCapInsets: .zero
-                ) else { continue }
-                shard.center = target.convert(CGPoint(x: rect.midX, y: rect.midY), to: contentView)
-                shard.transform = target.transform
-                contentView.addSubview(shard)
-                shards.append(shard)
-            }
-        }
-        return shards.isEmpty ? nil : shards
     }
 
     func collisionBehavior(
