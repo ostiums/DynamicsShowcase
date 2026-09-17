@@ -45,6 +45,8 @@ final class WreckingBallDemoViewController: DemoViewController, UICollisionBehav
     /// has already bounced and slowed down.
     private var lastBallVelocity: CGPoint = .zero
     private var wallCleared = false
+    /// Walls knocked down so far; picks the wall's words and the payoff line.
+    private var round = 0
     private var counterLabel: UILabel?
     /// Bricks knocked out of the wall this round; never goes back down.
     private var destroyedCount = 0
@@ -166,6 +168,7 @@ final class WreckingBallDemoViewController: DemoViewController, UICollisionBehav
         trailPoints.removeAll()
         lastBallVelocity = .zero
         wallCleared = false
+        round = 0
         destroyedCount = 0
         frozenMotion.removeAll()
         isFrozen = false
@@ -376,7 +379,7 @@ final class WreckingBallDemoViewController: DemoViewController, UICollisionBehav
     /// after a cleared wall.
     private func spawnWall(animated: Bool) {
         guard let wallLayout else { return }
-        let words = viewModel.bricks
+        let words = viewModel.brickWords(forRound: round)
 
         for (index, center) in wallLayout.brickCenters.enumerated() {
             let row = index / viewModel.wallColumns
@@ -795,16 +798,23 @@ final class WreckingBallDemoViewController: DemoViewController, UICollisionBehav
         Haptics.action()
 
         let label = UILabel()
-        label.text = viewModel.payoff
-        label.font = UIFont.systemFont(ofSize: 40, weight: .black).rounded()
+        label.text = viewModel.payoff(forRound: round)
+        label.font = UIFont.systemFont(ofSize: viewModel.payoffFontSize, weight: .black).rounded()
+        label.adjustsFontSizeToFitWidth = true
+        label.minimumScaleFactor = 0.5
         label.textColor = viewModel.inkColor
         label.textAlignment = .center
         label.sizeToFit()
+        label.bounds.size.width = min(label.bounds.width, viewModel.payoffMaxWidth(in: view.bounds))
         label.layer.shadowColor = viewModel.wreckingBallColor.cgColor
         label.layer.shadowOpacity = 1
         label.layer.shadowRadius = 0
         label.layer.shadowOffset = CGSize(width: 3, height: 4)
-        let target = viewModel.payoffPoint(in: view.bounds, layout: wallLayout)
+        let target = viewModel.payoffPoint(
+            in: view.bounds,
+            layout: wallLayout,
+            labelWidth: label.bounds.width
+        )
         label.center = CGPoint(x: target.x, y: -60)
         contentView.addSubview(label)
         payoffLabel = label
@@ -838,6 +848,7 @@ final class WreckingBallDemoViewController: DemoViewController, UICollisionBehav
 
         // Whatever is left of the old wall is swept away.
         bricks.forEach(discard)
+        round += 1
 
         spawnWall(animated: true)
         wallCleared = false

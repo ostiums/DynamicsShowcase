@@ -19,8 +19,19 @@ struct WreckingBallDemoViewModel {
         "Nobody uses it", "Just migrate",
         "Storyboards", "Boilerplate",
     ]
-    /// Drops in once the wall is gone.
-    let payoff = "STILL ALIVE"
+    /// Every wall after the first is drawn at random from the first wall's
+    /// words and these.
+    let extraBricks = [
+        "Dinosaur", "Tech debt", "So 2014", "RIP UIKit",
+        "Massive VC", "Too verbose", "No previews", "Imperative",
+        "Let it go", "Ok boomer", "Delegates, lol", "XIB hell",
+        "Use Flutter", "Dead tech", "Stop using it", "Nobody hires",
+    ]
+    /// Drops in once the wall is gone — a new line for every wall, in order.
+    let payoffs = ["STILL ALIVE", "SINCE 2008", "SwiftUI RUNS ON ME", "ANY QUESTIONS?"]
+    let payoffFontSize: CGFloat = 40
+    /// The payoff line keeps this far from the screen edges.
+    let payoffSideInset: CGFloat = 16
 
     // The look: a construction site drawn on a drafting sheet. Unlike the
     // rest of the app this screen is light — flat saturated color, dark
@@ -256,8 +267,29 @@ struct WreckingBallDemoViewModel {
         return clearOfPedestal && heading
     }
 
-    /// Where the payoff line settles: above the wall, out of the swing.
-    func payoffPoint(in bounds: CGRect, layout: WallLayout) -> CGPoint {
-        CGPoint(x: bounds.width - wallRightInset, y: layout.platformY - 300)
+    /// The words of a round's wall, in the order of `WallLayout.brickCenters`.
+    /// The first wall is the scripted one; the rest are a fresh draw.
+    func brickWords(forRound round: Int) -> [String] {
+        guard round > 0 else { return bricks }
+        return Array((bricks + extraBricks).shuffled().prefix(wallRows * wallColumns))
+    }
+
+    func payoff(forRound round: Int) -> String {
+        payoffs[round % payoffs.count]
+    }
+
+    /// The widest the payoff line may be; a longer one shrinks its type.
+    func payoffMaxWidth(in bounds: CGRect) -> CGFloat {
+        bounds.width - 2 * payoffSideInset
+    }
+
+    /// Where the payoff line settles: above the wall, out of the swing —
+    /// moved toward the middle as far as a wide line needs to stay on screen.
+    func payoffPoint(in bounds: CGRect, layout: WallLayout, labelWidth: CGFloat) -> CGPoint {
+        let limit = bounds.width - payoffSideInset - labelWidth / 2
+        return CGPoint(
+            x: min(bounds.width - wallRightInset, limit),
+            y: layout.platformY - 300
+        )
     }
 }
