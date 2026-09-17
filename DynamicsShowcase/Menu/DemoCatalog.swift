@@ -31,7 +31,7 @@ enum DemoCatalog {
         DemoDescriptor(
             emoji: "🏗️",
             accentColor: Palette.violet,
-            title: "Wrecking Ball",
+            title: "Old but gold",
             apiSummary: "UIAttachmentBehavior",
             makeViewController: { WreckingBallDemoViewController() }
         ),

@@ -45,6 +45,22 @@ final class WreckingBallDemoViewController: DemoViewController, UICollisionBehav
     /// has already bounced and slowed down.
     private var lastBallVelocity: CGPoint = .zero
     private var wallCleared = false
+    private var counterLabel: UILabel?
+    /// Bricks knocked out of the wall this round; never goes back down.
+    private var destroyedCount = 0
+
+    /// Velocities taken away from the items for the length of a hit-stop.
+    private struct FrozenMotion {
+        let behavior: UIDynamicItemBehavior
+        let item: UIDynamicItem
+        let linear: CGPoint
+        let angular: CGFloat
+    }
+    private var frozenMotion: [FrozenMotion] = []
+    private var isFrozen = false
+    private var lastHitStop: CFTimeInterval = 0
+    /// One behavior per shattered brick, holding its shards.
+    private var debrisBehaviors: [UIDynamicItemBehavior] = []
     /// Set once the payoff has had its moment; the rebuild itself waits for
     /// the ball to swing clear of the pedestal.
     private var rebuildPending = false
@@ -150,6 +166,10 @@ final class WreckingBallDemoViewController: DemoViewController, UICollisionBehav
         trailPoints.removeAll()
         lastBallVelocity = .zero
         wallCleared = false
+        destroyedCount = 0
+        frozenMotion.removeAll()
+        isFrozen = false
+        debrisBehaviors.removeAll()
         rebuildPending = false
         payoffLabel = nil
         payoffBehaviors.removeAll()
@@ -204,6 +224,7 @@ final class WreckingBallDemoViewController: DemoViewController, UICollisionBehav
         addPlatform(wallLayout)
         spawnWall(animated: false)
         addBall()
+        addCounter()
         drawRope(dt: 0)
     }
 
@@ -215,6 +236,35 @@ final class WreckingBallDemoViewController: DemoViewController, UICollisionBehav
         dot.layer.cornerRadius = 7
         dot.center = anchorPoint
         contentView.addSubview(dot)
+    }
+
+    private func addCounter() {
+        let label = UILabel()
+        label.font = UIFont.monospacedDigitSystemFont(ofSize: 15, weight: .bold).rounded()
+        label.textColor = viewModel.inkColor.withAlphaComponent(0.7)
+        label.text = viewModel.counterText(destroyed: 0)
+        label.sizeToFit()
+        // Left-aligned under the large title; the anchor keeps the pop
+        // animation growing away from the screen edge.
+        label.layer.anchorPoint = CGPoint(x: 0, y: 0.5)
+        label.layer.position = CGPoint(
+            x: 20,
+            y: view.safeAreaLayoutGuide.layoutFrame.minY + 14
+        )
+        contentView.addSubview(label)
+        counterLabel = label
+    }
+
+    private func updateCounter(destroyed: Int) {
+        guard destroyed > destroyedCount, let counterLabel else { return }
+        destroyedCount = destroyed
+        counterLabel.text = viewModel.counterText(destroyed: destroyed)
+        counterLabel.sizeToFit()
+
+        let pop = CAKeyframeAnimation(keyPath: "transform.scale")
+        pop.values = [1, 1.18, 1]
+        pop.duration = 0.2
+        counterLabel.layer.add(pop, forKey: "pop")
     }
 
     private func addTrail() {
@@ -450,8 +500,11 @@ final class WreckingBallDemoViewController: DemoViewController, UICollisionBehav
         drawRope(dt: link.targetTimestamp - link.timestamp)
         guard let wreckingBall else { return }
 
-        lastBallVelocity = ballProperties.linearVelocity(for: wreckingBall)
-        updateTrail(with: wreckingBall.center)
+        // A frozen scene has no velocities to sample and no trail to extend.
+        if !isFrozen {
+            lastBallVelocity = ballProperties.linearVelocity(for: wreckingBall)
+            updateTrail(with: wreckingBall.center)
+        }
 
         // Bricks that flew off the screen are gone; keep the simulation lean.
         for brick in bricks where viewModel.isOffScreen(brickCenter: brick.center, in: view.bounds) {
@@ -460,15 +513,16 @@ final class WreckingBallDemoViewController: DemoViewController, UICollisionBehav
 
         // The wall is down once nothing is left standing — rubble on the
         // pedestal doesn't count, the rebuild sweeps it away.
-        let standing = bricks.contains { brick in
+        let standing = bricks.filter { brick in
             guard let home = brickHomes[brick] else { return false }
             return viewModel.isStanding(
                 brickCenter: brick.center,
                 rotation: atan2(brick.transform.b, brick.transform.a),
                 home: home
             )
-        }
-        if !wallCleared, !standing {
+        }.count
+        updateCounter(destroyed: viewModel.wallRows * viewModel.wallColumns - standing)
+        if !wallCleared, standing == 0 {
             wallCleared = true
             celebrate()
         }
@@ -556,6 +610,7 @@ final class WreckingBallDemoViewController: DemoViewController, UICollisionBehav
         shatter(brick)
         shockwave(at: point)
         shakeScreen()
+        hitStop()
         Haptics.collision(intensity: 1)
     }
 
@@ -596,17 +651,74 @@ final class WreckingBallDemoViewController: DemoViewController, UICollisionBehav
             )
             debris.addAngularVelocity(.random(in: viewModel.shardSpinRange), for: shard)
         }
+        debrisBehaviors.append(debris)
+        // A brick shattered while the scene stands still waits with the rest.
+        if isFrozen {
+            freeze(debris)
+        }
 
         // Sweep the debris once it has fallen off the screen.
         schedule(after: viewModel.shardCleanupDelay) { [weak self] in
             guard let self else { return }
             self.animator.removeBehavior(debris)
+            self.debrisBehaviors.removeAll { $0 === debris }
             shards.forEach {
                 self.gravity.removeItem($0)
                 self.removeShadow(for: $0)
                 $0.removeFromSuperview()
             }
         }
+    }
+
+    // MARK: - Hit-stop
+
+    /// The animator has no clock to slow down, so the scene is frozen by
+    /// hand: every item's velocity is taken away and remembered, gravity
+    /// and the rope let go, and a moment later everything gets its motion
+    /// back. `beganContact` fires after the collision is resolved, so what
+    /// is remembered is the motion the hit produced. Layer animations —
+    /// the shockwave, the shake — aren't the animator's and play on.
+    private func hitStop() {
+        let now = CACurrentMediaTime()
+        guard !isFrozen, dragAttachment == nil, now - lastHitStop > viewModel.hitStopCooldown else { return }
+        lastHitStop = now
+        isFrozen = true
+
+        gravity.gravityDirection = .zero
+        rope?.isPaused = true
+        ([ballProperties, brickProperties] + debrisBehaviors).forEach(freeze)
+
+        schedule(after: viewModel.hitStopDuration) { [weak self] in
+            self?.unfreeze()
+        }
+    }
+
+    private func freeze(_ behavior: UIDynamicItemBehavior) {
+        for item in behavior.items {
+            let linear = behavior.linearVelocity(for: item)
+            let angular = behavior.angularVelocity(for: item)
+            frozenMotion.append(FrozenMotion(
+                behavior: behavior,
+                item: item,
+                linear: linear,
+                angular: angular
+            ))
+            behavior.addLinearVelocity(CGPoint(x: -linear.x, y: -linear.y), for: item)
+            behavior.addAngularVelocity(-angular, for: item)
+        }
+    }
+
+    private func unfreeze() {
+        // The direction, not `magnitude`: a zeroed gravity vector has lost
+        // its angle, and setting the magnitude alone would point it sideways.
+        gravity.gravityDirection = CGVector(dx: 0, dy: viewModel.gravityMagnitude)
+        rope?.isPaused = false
+        for motion in frozenMotion {
+            motion.behavior.addLinearVelocity(motion.linear, for: motion.item)
+            motion.behavior.addAngularVelocity(motion.angular, for: motion.item)
+        }
+        frozenMotion.removeAll()
+        isFrozen = false
     }
 
     /// A shard is a clear view holding the snapshot piece, which leaves
@@ -729,5 +841,8 @@ final class WreckingBallDemoViewController: DemoViewController, UICollisionBehav
 
         spawnWall(animated: true)
         wallCleared = false
+        destroyedCount = 0
+        counterLabel?.text = viewModel.counterText(destroyed: 0)
+        counterLabel?.sizeToFit()
     }
 }

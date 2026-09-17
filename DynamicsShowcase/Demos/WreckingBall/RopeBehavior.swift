@@ -22,6 +22,8 @@ final class RopeBehavior: UIDynamicBehavior {
     /// Reads and changes the item's velocity. The item must belong to it.
     private weak var body: UIDynamicItemBehavior?
     private var lastStepTime: TimeInterval?
+    /// A paused rope pulls nothing; for freezing the scene.
+    var isPaused = false
 
     init(
         item: UIDynamicItem,
@@ -65,7 +67,7 @@ final class RopeBehavior: UIDynamicBehavior {
         guard let animator = dynamicAnimator, let body else { return }
         let now = animator.elapsedTime
         defer { lastStepTime = now }
-        guard let lastStepTime else { return }
+        guard !isPaused, let lastStepTime else { return }
         // The animator's clock stands still while the scene is at rest;
         // a long first step after a pause must not turn into a kick.
         let dt = min(now - lastStepTime, 1.0 / 30)

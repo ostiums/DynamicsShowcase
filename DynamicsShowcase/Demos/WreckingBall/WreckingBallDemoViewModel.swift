@@ -123,6 +123,17 @@ struct WreckingBallDemoViewModel {
     /// By this time the shards have rained off the screen.
     let shardCleanupDelay: TimeInterval = 2.5
 
+    /// Hit-stop: on a shattering hit the whole simulation stands still for
+    /// a moment while the shockwave and the shake play on — the pause is
+    /// what makes the hit read as heavy. One per swing, not one per brick.
+    let hitStopDuration: TimeInterval = 0.11
+    let hitStopCooldown: TimeInterval = 1.0
+
+    /// The score line under the title.
+    func counterText(destroyed: Int) -> String {
+        "Arguments destroyed: \(destroyed)/\(wallRows * wallColumns)"
+    }
+
     /// Number of ghost dots trailing the wrecking ball.
     let trailLength = 14
 
