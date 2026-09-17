@@ -1,12 +1,20 @@
 # DynamicsShowcase
 
-A demo app showing **everything UIKit Dynamics can do** — the physics engine built right into UIKit (`UIDynamicAnimator`). Dark neon theme, designed both as a screen-recording showcase and as a readable reference for learning the API.
+<img src="docs/wrecking-ball.gif" alt="A wrecking ball labelled UIKit swings on a rope into a wall of bricks reading UIKit is dead, Use SwiftUI, Legacy; the bricks shatter and STILL ALIVE drops in" width="300" align="right">
+
+**Everything UIKit Dynamics can do, in one app.** UIKit has shipped with a 2D physics engine since iOS 7 — `UIDynamicAnimator` — and almost nobody uses it. This project puts every behavior it has on screen: gravity, collisions, snaps, attachments, pushes, all ten force fields, and a few things the API doesn't offer out of the box (a rope that goes slack, a hit-stop, orbits on real inverse-square gravity).
+
+Every item on every screen is a plain `UIView`. No SpriteKit, no game engine, no dependencies, no assets — everything is drawn in code.
+
+It is meant to be read as much as run: each screen's view controller opens with a comment on the part of the API it demonstrates, and the pitfalls found along the way are collected [below](#uikit-dynamics-gotchas-encoded-in-this-project).
 
 ## Running
 
-Open `DynamicsShowcase.xcodeproj` in Xcode → Run (⌘R). iOS 16+, no dependencies, no assets — everything is drawn in code.
+Open `DynamicsShowcase.xcodeproj` in Xcode → Run (⌘R). iOS 16+.
 
-Jumping straight to a screen for recording: set the `AUTO_OPEN_DEMO` environment variable to `0…7` in the scheme — the app opens that demo immediately.
+To jump straight to a screen, set the `AUTO_OPEN_DEMO` environment variable to `0…7` in the scheme — the app opens that demo on launch.
+
+<br clear="right">
 
 ## Screens and API coverage
 
@@ -14,7 +22,7 @@ Jumping straight to a screen for recording: set the `AUTO_OPEN_DEMO` environment
 |---|---|
 | 🍎 Gravity | `UIGravityBehavior` (vector steered by finger, `magnitude` slider down to a zero-g freeze), `UICollisionBehavior` + `translatesReferenceBoundsIntoBoundary`, `UICollisionBehaviorDelegate` (flashes + haptics), elliptical collision bounds (`collisionBoundsType = .ellipse`) |
 | 🧲 Snap | `UISnapBehavior` with adjustable `damping` |
-| 🏗️ Wrecking Ball | `UIAttachmentBehavior` and a custom `UIDynamicBehavior` — a dense wrecking ball hangs on a real rope (`RopeBehavior`: slack it does nothing, stretched it is a damped spring, drawn as a sagging Verlet chain) over a light drafting-sheet scene with hard shadows; it smashes a wall of bricks, each brick carrying a word (a "UIKit" ball vs. a wall of "UIKit is dead", "Use SwiftUI", "Legacy"…); drag via a springy attachment to the finger — pull past the rope's reach and it stretches, then slings the ball back — or flick to throw; a hard hit shatters a brick into snapshot shards, sends out a shockwave, shakes the screen and freezes the scene for a beat (hit-stop); a counter keeps the score; once nothing is left standing the payoff line drops in on a `UISnapBehavior` and the wall is rebuilt |
+| 🏗️ Old but gold (wrecking ball) | `UIAttachmentBehavior` and a custom `UIDynamicBehavior`. A dense "UIKit" ball hangs on a real rope — `RopeBehavior`: slack it does nothing, stretched it is a damped spring; drawn as a sagging Verlet chain — and smashes a wall of bricks reading "UIKit is dead", "Use SwiftUI", "Legacy"… Drag it on a springy attachment (pull past the rope's reach and it slings back) or flick to throw. A hard hit shatters a brick into snapshot shards, sends out a shockwave, shakes the screen and freezes the scene for a beat (hit-stop). A cleared wall drops a payoff line in on a `UISnapBehavior` and is rebuilt with a fresh draw of words |
 | 🎱 Push Impulses | `UIPushBehavior` — `.instantaneous` (billiards-style slingshot: force = pull distance, spin via `setTargetOffsetFromCenter`) and `.continuous` with a rotating vector; a white cue ball, six pockets that pot the balls, a cleared table respawns the rack; the "Real UI" mode swaps the rack for a live settings screen (labels, cards, a working `UISwitch`, buttons): every cell hangs on a spring (`UIAttachmentBehavior` with `frequency`/`damping`), weighs in proportion to its area, squashes on contact and shatters into snapshot shards under a hard hit |
 | 🌀 Force Fields | `UIFieldBehavior` — all 10 types: radial, spring, vortex, noise, turbulence, velocity, linear, drag, electric, magnetic (charge via `UIDynamicItemBehavior.charge`), `UIRegion` |
 | 🪐 Solar System | `radialGravityField(falloff: 2)` — a true inverse-square gravity well; planets on calibrated circular orbits (`linearVelocity(for:)`, `updateItem(usingCurrentState:)`) |
@@ -62,20 +70,6 @@ DynamicsShowcase/
 - `UIGravityBehavior`'s default magnitude (1000 pt/s²) suits small items. A big scene — a 120 pt ball on a 425 pt rope — falls and swings in slow motion under it; scale `magnitude` with the scene. And keep `resistance` off debris: it reads as flying through water.
 - Contact friction combines both items' `friction`: a slick ball (`friction = 0`) sheds the bricks that land on it, whatever their own friction.
 - An item can have only one active `UISnapBehavior`; replace, don't stack.
-
-## Recording script (~60 sec)
-
-1. **Menu** (2 s) — scroll through the cards.
-2. **Gravity** (8 s) — tap a few times, then run a finger in circles: all the balls pour along the walls following the gravity vector.
-3. **Snap** (6 s) — tap the corners on "Bouncy 0.2", switch to "Stiff 0.9", tap again.
-4. **Wrecking Ball** (10 s) — flick the UIKit ball at the wall of "UIKit is dead": bricks shatter, "STILL ALIVE" drops in and the wall stands back up. A flick up and to the right sends it on a long arc that comes down on the wall.
-5. **Push** (9 s) — pull back and release to fire the white cue ball into the rack; sink a few balls into the pockets, switch the mode control to "2" (a slowly rotating continuous force), then to "3" and smash the fake settings screen.
-6. **Force Fields** (13 s) — the showstopper: Radial → drag the finger around (the swarm chases it) → Vortex (whirlpool) → Spring (pulsing cloud) → Velocity (fountain).
-7. **Solar System** (8 s) — an orrery running on real inverse-square gravity: planets glide along their rings, trails curving behind.
-8. **Body Properties** (4 s) — tap a couple of times: the elasticity difference is instantly visible.
-9. **Paywall Drop** (6 s) — the finale: tap "Start My 3-Day Free Trial" and the whole paywall falls off the screen, confetti rains, "You're all set" drifts in.
-
-Tip: the simulator has no haptics; for a recording with sound, use a physical device + QuickTime.
 
 ## License
 
