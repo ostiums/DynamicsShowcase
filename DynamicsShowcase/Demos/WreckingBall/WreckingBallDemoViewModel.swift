@@ -22,6 +22,26 @@ struct WreckingBallDemoViewModel {
     /// Drops in once the wall is gone.
     let payoff = "STILL ALIVE"
 
+    // The look: a construction site drawn on a drafting sheet. Unlike the
+    // rest of the app this screen is light — flat saturated color, dark
+    // ink and hard shadows read better than neon in a small muted video.
+    let sheetTop = UIColor(red: 0.95, green: 0.96, blue: 0.97, alpha: 1)
+    let sheetBottom = UIColor(red: 0.87, green: 0.90, blue: 0.92, alpha: 1)
+    let gridColor = UIColor(red: 0.79, green: 0.82, blue: 0.85, alpha: 1)
+    let inkColor = UIColor(red: 0.08, green: 0.09, blue: 0.12, alpha: 1)
+    /// One per course of the wall, bottom row first.
+    let brickColors = [
+        UIColor(red: 0.12, green: 0.44, blue: 0.92, alpha: 1),
+        UIColor(red: 0.90, green: 0.28, blue: 0.30, alpha: 1),
+        UIColor(red: 0.49, green: 0.30, blue: 1.00, alpha: 1),
+        UIColor(red: 0.07, green: 0.64, blue: 0.43, alpha: 1),
+        UIColor(red: 0.97, green: 0.41, blue: 0.03, alpha: 1),
+        UIColor(red: 0.05, green: 0.56, blue: 0.64, alpha: 1),
+    ]
+    /// Everything casts the same hard shadow, down and to the right.
+    let shadowOffset = CGSize(width: 4, height: 5)
+    let shadowOpacity: CGFloat = 0.26
+
     /// `UIGravityBehavior.magnitude` for everything in the scene. At the
     /// default 1 (1000 pt/s²) a 120 pt ball on a 425 pt rope swings and
     /// falls in slow motion; the scene is big, so gravity has to be too.
@@ -31,7 +51,8 @@ struct WreckingBallDemoViewModel {
 
     // The ball and its rope.
     let wreckingBallDiameter: CGFloat = 120
-    let wreckingBallColor = Palette.amber
+    /// Hazard yellow.
+    let wreckingBallColor = UIColor(red: 1.00, green: 0.77, blue: 0.00, alpha: 1)
     /// Unstretched rope length: the ball hangs level with the middle rows of the wall.
     let ropeLength: CGFloat = 425
     /// The stretched rope is a damped spring: soft enough to see it give
@@ -192,9 +213,9 @@ struct WreckingBallDemoViewModel {
         )
     }
 
-    /// Wall bricks take their color from the row, a neon stripe per course.
+    /// Wall bricks take their color from the row, a stripe per course.
     func brickColor(forRow row: Int) -> UIColor {
-        Palette.neon[row % Palette.neon.count]
+        brickColors[row % brickColors.count]
     }
 
     /// Whether a brick is still standing in the wall: at its home spot and

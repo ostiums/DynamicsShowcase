@@ -52,7 +52,7 @@ final class BallView: UIView {
     func flash() {
         let pulse = CABasicAnimation(keyPath: "shadowOpacity")
         pulse.fromValue = 1.0
-        pulse.toValue = 0.55
+        pulse.toValue = layer.shadowOpacity
         pulse.duration = 0.3
         pulse.timingFunction = CAMediaTimingFunction(name: .easeOut)
         layer.add(pulse, forKey: "flash")
@@ -92,24 +92,27 @@ final class BoxView: UIView {
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 }
 
-/// A brick of the wrecking-ball wall: a wide neon tile with a word on it.
+/// A brick of the wrecking-ball wall: a wide solid tile with a word on it.
+/// It carries no shadow of its own — a layer shadow turns with the brick;
+/// the wrecking-ball scene adds shadows that stay put under the light.
 final class BrickView: UIView {
     let color: UIColor
+    /// The brick's face. A sublayer rather than `backgroundColor`, so the
+    /// scene can slip a shadow layer underneath it.
+    private let face = CALayer()
 
     init(size: CGSize, color: UIColor, text: String) {
         self.color = color
         super.init(frame: CGRect(origin: .zero, size: size))
         isUserInteractionEnabled = false
 
-        backgroundColor = color.withAlphaComponent(0.2)
         layer.cornerRadius = size.height * 0.25
         layer.cornerCurve = .continuous
-        layer.borderWidth = 1.5
-        layer.borderColor = color.cgColor
-        layer.shadowColor = color.cgColor
-        layer.shadowOpacity = 0.45
-        layer.shadowRadius = 8
-        layer.shadowOffset = .zero
+        face.frame = bounds
+        face.backgroundColor = color.cgColor
+        face.cornerRadius = layer.cornerRadius
+        face.cornerCurve = .continuous
+        layer.addSublayer(face)
 
         let label = UILabel(frame: bounds.insetBy(dx: 6, dy: 2))
         label.autoresizingMask = [.flexibleWidth, .flexibleHeight]
@@ -124,7 +127,7 @@ final class BrickView: UIView {
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
-    /// A short jelly squash plus a white border flash the instant the brick
+    /// A short jelly squash plus a white flash the instant the brick
     /// is hit. Layer animations override the model values the animator keeps
     /// writing, so they play cleanly mid-flight.
     func squash() {
@@ -136,14 +139,14 @@ final class BrickView: UIView {
             animation.keyTimes = [0, 0.35, 0.7, 1]
             animation.duration = 0.22
         }
-        let border = CABasicAnimation(keyPath: "borderColor")
-        border.fromValue = UIColor.white.cgColor
-        border.toValue = color.cgColor
-        border.duration = 0.35
+        let blink = CABasicAnimation(keyPath: "backgroundColor")
+        blink.fromValue = UIColor.white.cgColor
+        blink.toValue = color.cgColor
+        blink.duration = 0.35
 
         layer.add(squashX, forKey: "squashX")
         layer.add(squashY, forKey: "squashY")
-        layer.add(border, forKey: "squashBorder")
+        face.add(blink, forKey: "squashBlink")
     }
 }
 

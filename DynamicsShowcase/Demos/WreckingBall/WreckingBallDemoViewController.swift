@@ -51,10 +51,17 @@ final class WreckingBallDemoViewController: DemoViewController, UICollisionBehav
     private var payoffLabel: UILabel?
     private var payoffBehaviors: [UIDynamicBehavior] = []
 
+    /// Hard shadows. A layer's own shadow is cast in the layer's coordinates
+    /// and would swing around a rotating brick. These are sublayers that
+    /// slide the opposite way as their view turns, so every shadow falls
+    /// down and to the right. Being part of the view, they can't lag behind
+    /// it the way a separate layer synced once per frame does.
+    private var shadows: [UIView: CALayer] = [:]
+    private var shadowObservations: [UIView: NSKeyValueObservation] = [:]
+
     /// Draws the rope between the anchor and the ball, beneath it.
     private let ropeLayer: CAShapeLayer = {
         let layer = CAShapeLayer()
-        layer.strokeColor = UIColor.white.withAlphaComponent(0.35).cgColor
         layer.lineCap = .round
         layer.lineJoin = .round
         layer.fillColor = nil
@@ -76,6 +83,19 @@ final class WreckingBallDemoViewController: DemoViewController, UICollisionBehav
     override func viewDidLoad() {
         super.viewDidLoad()
 
+        // This screen is light, unlike the rest of the app: the drafting
+        // sheet covers the shared dark gradient, and the navigation bar
+        // switches to dark ink for as long as the screen is up.
+        let sheet = BlueprintBackgroundView(
+            frame: view.bounds,
+            top: viewModel.sheetTop,
+            bottom: viewModel.sheetBottom,
+            line: viewModel.gridColor
+        )
+        sheet.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        view.insertSubview(sheet, belowSubview: contentView)
+        ropeLayer.strokeColor = viewModel.inkColor.withAlphaComponent(0.85).cgColor
+
         view.addGestureRecognizer(UIPanGestureRecognizer(target: self, action: #selector(handlePan)))
     }
 
@@ -85,6 +105,25 @@ final class WreckingBallDemoViewController: DemoViewController, UICollisionBehav
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         startDisplayLink()
+        styleNavigationBar(light: true)
+    }
+
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        styleNavigationBar(light: false)
+    }
+
+    private func styleNavigationBar(light: Bool) {
+        guard let bar = navigationController?.navigationBar else { return }
+        bar.overrideUserInterfaceStyle = light ? .light : .unspecified
+        bar.tintColor = light ? viewModel.inkColor : nil
+
+        guard light, navigationItem.standardAppearance == nil else { return }
+        let appearance = bar.standardAppearance.copy()
+        appearance.titleTextAttributes[.foregroundColor] = viewModel.inkColor
+        appearance.largeTitleTextAttributes[.foregroundColor] = viewModel.inkColor
+        navigationItem.standardAppearance = appearance
+        navigationItem.scrollEdgeAppearance = appearance
     }
 
     override func viewDidDisappear(_ animated: Bool) {
@@ -115,6 +154,8 @@ final class WreckingBallDemoViewController: DemoViewController, UICollisionBehav
         payoffLabel = nil
         payoffBehaviors.removeAll()
         dragAttachment = nil
+        shadows.removeAll()
+        shadowObservations.removeAll()
         rope = nil
         ropeChain = nil
 
@@ -170,12 +211,8 @@ final class WreckingBallDemoViewController: DemoViewController, UICollisionBehav
 
     private func addAnchorDot() {
         let dot = UIView(frame: CGRect(x: 0, y: 0, width: 14, height: 14))
-        dot.backgroundColor = .white
+        dot.backgroundColor = viewModel.inkColor
         dot.layer.cornerRadius = 7
-        dot.layer.shadowColor = UIColor.white.cgColor
-        dot.layer.shadowOpacity = 0.8
-        dot.layer.shadowRadius = 8
-        dot.layer.shadowOffset = .zero
         dot.center = anchorPoint
         contentView.addSubview(dot)
     }
@@ -188,7 +225,7 @@ final class WreckingBallDemoViewController: DemoViewController, UICollisionBehav
             dot.bounds = CGRect(x: 0, y: 0, width: diameter, height: diameter)
             dot.cornerRadius = diameter / 2
             dot.backgroundColor = viewModel.wreckingBallColor
-                .withAlphaComponent(0.04 + 0.28 * progress).cgColor
+                .withAlphaComponent(0.06 + 0.34 * progress).cgColor
             dot.isHidden = true
             contentView.layer.addSublayer(dot)
             return dot
@@ -202,8 +239,11 @@ final class WreckingBallDemoViewController: DemoViewController, UICollisionBehav
             label: viewModel.ballLabel
         )
         ball.center = viewModel.restPoint(anchor: anchorPoint)
+        // No glow at rest on a light sheet; `flash()` still pulses it on a hit.
+        ball.layer.shadowOpacity = 0
         contentView.addSubview(ball)
         wreckingBall = ball
+        addShadow(for: ball, cornerRadius: viewModel.wreckingBallDiameter / 2)
 
         gravity.addItem(ball)
         collision.addItem(ball)
@@ -237,8 +277,48 @@ final class WreckingBallDemoViewController: DemoViewController, UICollisionBehav
         )
         contentView.layer.addSublayer(CAShapeLayer.boundaryLine(
             from: layout.platformStart,
-            to: layout.platformEnd
+            to: layout.platformEnd,
+            color: viewModel.inkColor,
+            glow: nil
         ))
+    }
+
+    private func addShadow(for view: UIView, cornerRadius: CGFloat) {
+        let shadow = CALayer()
+        shadow.bounds = view.bounds
+        shadow.cornerRadius = cornerRadius
+        shadow.cornerCurve = view.layer.cornerCurve
+        shadow.backgroundColor = viewModel.inkColor
+            .withAlphaComponent(viewModel.shadowOpacity).cgColor
+        // Beneath the view's own content.
+        shadow.zPosition = -1
+        view.layer.addSublayer(shadow)
+        shadows[view] = shadow
+        updateShadow(of: view)
+
+        shadowObservations[view] = view.layer.observe(\.transform) { [weak self, weak view] _, _ in
+            if let view { self?.updateShadow(of: view) }
+        }
+    }
+
+    private func removeShadow(for view: UIView) {
+        shadowObservations[view] = nil
+        shadows.removeValue(forKey: view)?.removeFromSuperlayer()
+    }
+
+    /// Places the shadow at the scene's offset, expressed in the view's
+    /// own — rotated — coordinates.
+    private func updateShadow(of view: UIView) {
+        guard let shadow = shadows[view] else { return }
+        let angle = atan2(view.transform.b, view.transform.a)
+        let offset = viewModel.shadowOffset
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        shadow.position = CGPoint(
+            x: view.bounds.midX + offset.width * cos(angle) + offset.height * sin(angle),
+            y: view.bounds.midY - offset.width * sin(angle) + offset.height * cos(angle)
+        )
+        CATransaction.commit()
     }
 
     /// Lays the bricks. Animated, they drop in from above the screen row by
@@ -263,6 +343,7 @@ final class WreckingBallDemoViewController: DemoViewController, UICollisionBehav
             }
             bricks.append(brick)
             brickHomes[brick] = center
+            addShadow(for: brick, cornerRadius: brick.layer.cornerRadius)
 
             guard animated else {
                 addToSimulation(brick)
@@ -306,6 +387,7 @@ final class WreckingBallDemoViewController: DemoViewController, UICollisionBehav
         removeFromSimulation(brick)
         bricks.removeAll { $0 === brick }
         brickHomes[brick] = nil
+        removeShadow(for: brick)
         brick.removeFromSuperview()
     }
 
@@ -463,10 +545,13 @@ final class WreckingBallDemoViewController: DemoViewController, UICollisionBehav
     /// The wrecking ball has hit a brick: a light touch rocks it, a hard
     /// one breaks it — with the whole screen feeling the impact.
     private func brickHit(_ brick: BrickView, at point: CGPoint) {
-        brick.squash()
-
         let speed = hypot(lastBallVelocity.x, lastBallVelocity.y)
-        guard speed > viewModel.shatterSpeedThreshold else { return }
+        guard speed > viewModel.shatterSpeedThreshold else {
+            brick.squash()
+            return
+        }
+        // No squash on a brick about to shatter: the shards are snapshots
+        // and would be taken mid-blink, white.
 
         shatter(brick)
         shockwave(at: point)
@@ -480,14 +565,22 @@ final class WreckingBallDemoViewController: DemoViewController, UICollisionBehav
     /// center, keep some of the ball's momentum and rain out of the screen.
     /// They collide with nothing, so the wall isn't disturbed by its own debris.
     private func shatter(_ brick: BrickView) {
-        guard let shards = brick.makeShards(in: contentView, columns: 4, rows: 2) else { return }
+        guard let snapshots = brick.makeShards(in: contentView, columns: 4, rows: 2) else { return }
+        let shards = snapshots.map { wrapShard($0, color: brick.color) }
         let origin = brick.center
         discard(brick)
 
         let debris = UIDynamicItemBehavior(items: shards)
         debris.angularResistance = viewModel.shardAngularResistance
         animator.addBehavior(debris)
-        shards.forEach(gravity.addItem)
+        shards.forEach {
+            // Debris flies behind the ball, not across its face.
+            if let wreckingBall {
+                contentView.insertSubview($0, belowSubview: wreckingBall)
+            }
+            gravity.addItem($0)
+            addShadow(for: $0, cornerRadius: 0)
+        }
 
         for shard in shards {
             let dx = shard.center.x - origin.x
@@ -510,21 +603,42 @@ final class WreckingBallDemoViewController: DemoViewController, UICollisionBehav
             self.animator.removeBehavior(debris)
             shards.forEach {
                 self.gravity.removeItem($0)
+                self.removeShadow(for: $0)
                 $0.removeFromSuperview()
             }
         }
     }
 
-    /// A white ring expanding out of the contact point.
+    /// A shard is a clear view holding the snapshot piece, which leaves
+    /// room underneath for its shadow. A snapshot of a brick in mid-flight
+    /// can come back empty; the brick's color behind it keeps such a shard
+    /// visible.
+    private func wrapShard(_ snapshot: UIView, color: UIColor) -> UIView {
+        let shard = UIView(frame: snapshot.bounds)
+        shard.center = snapshot.center
+        shard.transform = snapshot.transform
+        let backing = CALayer()
+        backing.frame = shard.bounds
+        backing.backgroundColor = color.cgColor
+        shard.layer.addSublayer(backing)
+
+        snapshot.transform = .identity
+        snapshot.frame = shard.bounds
+        shard.addSubview(snapshot)
+        contentView.addSubview(shard)
+        return shard
+    }
+
+    /// An ink ring expanding out of the contact point.
     private func shockwave(at point: CGPoint) {
         let radius: CGFloat = 70
         let ring = CAShapeLayer()
         ring.bounds = CGRect(x: 0, y: 0, width: radius * 2, height: radius * 2)
         ring.position = point
         ring.path = UIBezierPath(ovalIn: ring.bounds).cgPath
-        ring.strokeColor = UIColor.white.cgColor
+        ring.strokeColor = viewModel.inkColor.cgColor
         ring.fillColor = nil
-        ring.lineWidth = 3
+        ring.lineWidth = 2
         ring.opacity = 0
         contentView.layer.addSublayer(ring)
 
@@ -532,7 +646,7 @@ final class WreckingBallDemoViewController: DemoViewController, UICollisionBehav
         scale.fromValue = 0.15
         scale.toValue = 1
         let fade = CABasicAnimation(keyPath: "opacity")
-        fade.fromValue = 0.9
+        fade.fromValue = 0.5
         fade.toValue = 0
         let group = CAAnimationGroup()
         group.animations = [scale, fade]
@@ -571,13 +685,13 @@ final class WreckingBallDemoViewController: DemoViewController, UICollisionBehav
         let label = UILabel()
         label.text = viewModel.payoff
         label.font = UIFont.systemFont(ofSize: 40, weight: .black).rounded()
-        label.textColor = .white
+        label.textColor = viewModel.inkColor
         label.textAlignment = .center
         label.sizeToFit()
-        label.layer.shadowColor = Palette.amber.cgColor
-        label.layer.shadowOpacity = 0.6
-        label.layer.shadowRadius = 10
-        label.layer.shadowOffset = .zero
+        label.layer.shadowColor = viewModel.wreckingBallColor.cgColor
+        label.layer.shadowOpacity = 1
+        label.layer.shadowRadius = 0
+        label.layer.shadowOffset = CGSize(width: 3, height: 4)
         let target = viewModel.payoffPoint(in: view.bounds, layout: wallLayout)
         label.center = CGPoint(x: target.x, y: -60)
         contentView.addSubview(label)
