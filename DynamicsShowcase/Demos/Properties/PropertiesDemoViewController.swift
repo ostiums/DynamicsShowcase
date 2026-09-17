@@ -160,23 +160,3 @@ final class PropertiesDemoViewController: DemoViewController {
         contentView.addSubview(label)
     }
 }
-
-// MARK: - The gist
-//
-// The physics core of this screen, stripped of layout and styling.
-/*
-
-// UIDynamicItemBehavior carries the physical properties of items.
-// Each ball gets its own behavior, so the values compare side by side.
-for (ball, elasticity) in zip(balls, [0.1, 0.4, 0.7, 0.95]) {
-    let properties = UIDynamicItemBehavior(items: [ball])
-    properties.elasticity = elasticity  // how much bounce survives a hit
-    animator.addBehavior(properties)
-}
-
-// density is mass: the same impulse moves a dense ball less.
-properties.density = 2.4
-let push = UIPushBehavior(items: [ball], mode: .instantaneous)
-push.pushDirection = CGVector(dx: 1.6, dy: 0)  // identical in every lane
-animator.addBehavior(push)
-*/

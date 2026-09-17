@@ -184,24 +184,3 @@ final class FieldsDemoViewController: DemoViewController {
         }
     }
 }
-
-// MARK: - The gist
-//
-// The physics core of this screen, stripped of layout and styling.
-/*
-
-// UIFieldBehavior ships ten ready-made fields: radialGravity,
-// linearGravity, spring, vortex, electric, magnetic, drag,
-// velocity, noise and turbulence.
-let field = UIFieldBehavior.radialGravityField(position: center)
-field.strength = 12
-field.falloff = 1
-animator.addBehavior(field)
-
-// A field affects only the items explicitly added to it —
-// forget addItem(_:) and the field silently does nothing.
-particles.forEach { field.addItem($0) }
-
-// Point-based fields follow the finger.
-field.position = touchLocation
-*/

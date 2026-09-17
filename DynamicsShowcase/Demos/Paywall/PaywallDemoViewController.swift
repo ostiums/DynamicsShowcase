@@ -378,32 +378,3 @@ final class PaywallDemoViewController: DemoViewController {
     }
 
 }
-
-// MARK: - The gist
-//
-// The physics core of this screen, stripped of layout and styling.
-/*
-
-// Any UIView already is a UIDynamicItem — even a live paywall.
-// One tap hands the whole layout over to the physics engine,
-// and gravity carries it right off the screen.
-let gravity = UIGravityBehavior(items: paywallElements)
-let bodies = UIDynamicItemBehavior(items: paywallElements)
-bodies.allowsRotation = false  // the elements fall upright, no tumbling
-animator.addBehavior(gravity)
-animator.addBehavior(bodies)
-
-// A pop of scatter, so the layout bursts apart as it falls.
-for element in paywallElements {
-    bodies.addLinearVelocity(scatterKick(), for: element)
-}
-
-// The greeting drifts in on a damped spring — a snap slowed
-// down by resistance — while confetti falls.
-let snap = UISnapBehavior(item: greeting, snapTo: center)
-snap.damping = 0.85
-let drift = UIDynamicItemBehavior(items: [greeting])
-drift.resistance = 3
-animator.addBehavior(snap)
-animator.addBehavior(drift)
-*/

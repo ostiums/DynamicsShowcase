@@ -206,37 +206,3 @@ final class GravityDemoViewController: DemoViewController, UICollisionBehaviorDe
         reactToContact(item, intensity: 0.7)
     }
 }
-
-// MARK: - The gist
-//
-// The physics core of this screen, stripped of layout and styling.
-/*
-
-let animator = UIDynamicAnimator(referenceView: view)
-
-let gravity = UIGravityBehavior()
-let collision = UICollisionBehavior()
-collision.translatesReferenceBoundsIntoBoundary = true  // screen edges become walls
-animator.addBehavior(gravity)
-animator.addBehavior(collision)
-
-// Every tap hands one more ball over to the simulation.
-gravity.addItem(ball)
-collision.addItem(ball)
-
-// Pan steers the vector, the slider scales it. Direction and strength
-// are one CGVector: its length IS the magnitude (1 is UIKit's default),
-// so assigning a unit direction would reset the strength back to 1.
-gravity.gravityDirection = CGVector(
-    dx: cos(angle) * magnitude,
-    dy: sin(angle) * magnitude
-)
-
-// At zero gravity the balls freeze mid-air: cancel their velocity
-// (there is no setter — add the inverse of the current value).
-let velocity = ballProperties.linearVelocity(for: ball)
-ballProperties.addLinearVelocity(
-    CGPoint(x: -velocity.x, y: -velocity.y),
-    for: ball
-)
-*/
