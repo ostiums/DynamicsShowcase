@@ -1,6 +1,6 @@
 import UIKit
 
-/// Configuration and pure geometry of the wrecking-ball scene: the cable,
+/// Configuration and pure geometry of the wrecking-ball scene: the rope,
 /// the brick wall, the label sets. All the math lives here, fully testable
 /// and free of any UIKit Dynamics code.
 struct WreckingBallDemoViewModel {
@@ -22,25 +22,48 @@ struct WreckingBallDemoViewModel {
     /// Drops in once the wall is gone.
     let payoff = "STILL ALIVE"
 
-    // The ball and its cable.
+    /// `UIGravityBehavior.magnitude` for everything in the scene. At the
+    /// default 1 (1000 pt/s²) a 120 pt ball on a 425 pt rope swings and
+    /// falls in slow motion; the scene is big, so gravity has to be too.
+    let gravityMagnitude: CGFloat = 2.5
+    /// `UIGravityBehavior`'s unit magnitude, in points per second squared.
+    let gravityUnit: CGFloat = 1000
+
+    // The ball and its rope.
     let wreckingBallDiameter: CGFloat = 120
     let wreckingBallColor = Palette.amber
-    /// Cable length: the ball hangs level with the middle rows of the wall.
-    let cableLength: CGFloat = 425
+    /// Unstretched rope length: the ball hangs level with the middle rows of the wall.
+    let ropeLength: CGFloat = 425
+    /// The stretched rope is a damped spring: soft enough to see it give
+    /// when the ball is caught at the end of a fall or pulled by hand,
+    /// damped enough to settle after a couple of bounces.
+    let ropeFrequency: CGFloat = 3.5
+    let ropeDampingRatio: CGFloat = 0.35
+    /// Points of the drawn rope's chain.
+    let ropeLinks = 14
+    let ropeLineWidth: CGFloat = 2.5
     /// Radius within which a pan grabs the ball.
     let grabRadius: CGFloat = 110
+    /// The finger holds the ball on a spring of its own, soft enough to
+    /// give in a tug-of-war against the rope.
+    let dragFrequency: CGFloat = 6
+    let dragDamping: CGFloat = 8
+    /// The ball's `resistance` while it is held: a hand steadies what it
+    /// holds, and the rope's pull against the drag spring would otherwise
+    /// leave the ball buzzing in place.
+    let heldBallResistance: CGFloat = 5
     /// Cap on the speed a flick can give the ball.
-    let maxThrowSpeed: CGFloat = 1400
+    let maxThrowSpeed: CGFloat = 2200
 
     /// The anchor hangs left of center so the ball rests clear of the wall
     /// and swings into it from the side.
     let anchorXFraction: CGFloat = 0.19
     let anchorTopInset: CGFloat = 70
 
-    // Ball physics. It barely loses energy: the pendulum keeps going
-    // through the wall several times on one throw.
+    // Ball physics. Next to no air drag: the pendulum keeps going through
+    // the wall several times on one throw and loses its energy to the hits.
     let ballElasticity: CGFloat = 0.3
-    let ballResistance: CGFloat = 0.04
+    let ballResistance: CGFloat = 0.08
     let ballAngularResistance: CGFloat = 0.1
     /// Much denser than the bricks — that's what carries the momentum.
     let wreckingBallDensity: CGFloat = 4
@@ -60,8 +83,10 @@ struct WreckingBallDemoViewModel {
     /// stops well short of the edge, so a brick shoved off its far end falls
     /// instead of leaning on the screen boundary.
     let wallRightInset: CGFloat = 150
-    /// The pedestal stands this far above the bottom of the screen.
-    let platformBottomInset: CGFloat = 110
+    /// The pedestal stands this far above the lowest point of the hanging
+    /// ball, so the swing sweeps the bottom row too instead of passing
+    /// over it. The ball itself doesn't collide with the pedestal.
+    let platformRise: CGFloat = 10
     /// A brick still counts as part of the wall while it sits this close to
     /// its home spot and this level. Anything else is rubble.
     let standingMaxOffset: CGFloat = 30
@@ -69,12 +94,13 @@ struct WreckingBallDemoViewModel {
 
     /// Ball speed (pt/s) at contact that breaks a brick into shards and
     /// shakes the screen instead of just knocking the brick over.
-    let shatterSpeedThreshold: CGFloat = 450
-    let shardBurstSpeed: ClosedRange<CGFloat> = 80...260
+    let shatterSpeedThreshold: CGFloat = 700
+    let shardBurstSpeed: ClosedRange<CGFloat> = 130...420
     let shardSpinRange: ClosedRange<CGFloat> = -8...8
-    let shardResistance: CGFloat = 0.8
+    /// Shards tumble, but nothing slows their flight: they fall like the bricks do.
+    let shardAngularResistance: CGFloat = 0.4
     /// By this time the shards have rained off the screen.
-    let shardCleanupDelay: TimeInterval = 3.5
+    let shardCleanupDelay: TimeInterval = 2.5
 
     /// Number of ghost dots trailing the wrecking ball.
     let trailLength = 14
@@ -87,19 +113,33 @@ struct WreckingBallDemoViewModel {
     let payoffSnapDamping: CGFloat = 0.6
     let payoffResistance: CGFloat = 6
 
-    // MARK: - Cable
+    // MARK: - Rope
 
     func anchorPoint(in bounds: CGRect, safeTop: CGFloat) -> CGPoint {
         CGPoint(x: bounds.width * anchorXFraction, y: safeTop + anchorTopInset)
     }
 
-    /// Where the ball hangs at rest: straight down from the anchor.
-    func restPoint(anchor: CGPoint) -> CGPoint {
-        CGPoint(x: anchor.x, y: anchor.y + cableLength)
+    /// How far the ball's weight stretches the rope at rest: `g / ω²`.
+    var restStretch: CGFloat {
+        let omega = 2 * .pi * ropeFrequency
+        return gravityMagnitude * gravityUnit / (omega * omega)
     }
 
-    /// The velocity a released ball gets from the gesture: the finger's own,
-    /// capped so a wild flick can't launch the ball into orbit.
+    /// Where the ball hangs at rest: straight down from the anchor, the
+    /// rope already stretched by its weight — so a fresh scene doesn't bob.
+    func restPoint(anchor: CGPoint) -> CGPoint {
+        CGPoint(x: anchor.x, y: anchor.y + ropeLength + restStretch)
+    }
+
+    /// The drawn rope thins out as it stretches, like anything elastic.
+    func ropeLineWidth(stretch: CGFloat) -> CGFloat {
+        let elongation = 1 + max(0, stretch) / ropeLength
+        return max(1, ropeLineWidth / (elongation * elongation))
+    }
+
+    /// The velocity a released ball leaves with: the hand's own — what a
+    /// firm grip gives anything it lets go of — capped so a wild flick
+    /// can't launch the ball into orbit.
     func throwVelocity(fromGesture velocity: CGPoint) -> CGPoint {
         let speed = hypot(velocity.x, velocity.y)
         guard speed > maxThrowSpeed else { return velocity }
@@ -107,31 +147,6 @@ struct WreckingBallDemoViewModel {
             x: velocity.x / speed * maxThrowSpeed,
             y: velocity.y / speed * maxThrowSpeed
         )
-    }
-
-    /// `UIGravityBehavior`'s unit magnitude, in points per second squared.
-    let gravityAcceleration: CGFloat = 1000
-
-    /// Whether the cable should catch the ball: it has reached its full
-    /// reach from the anchor and is still heading outward (or resting there).
-    func shouldAttachCable(ballCenter: CGPoint, velocity: CGPoint, anchor: CGPoint) -> Bool {
-        let dx = ballCenter.x - anchor.x
-        let dy = ballCenter.y - anchor.y
-        let distance = hypot(dx, dy)
-        guard distance >= cableLength - 1 else { return false }
-        let radialSpeed = (velocity.x * dx + velocity.y * dy) / max(distance, 1)
-        return radialSpeed >= 0
-    }
-
-    /// Whether a taut cable is actually pulling. A rope on a swinging ball
-    /// is under tension while `v²/L + g·cosθ > 0` (θ measured from straight
-    /// down): always below the anchor, above it only when the ball is moving
-    /// fast enough to be flung outward. Otherwise the rope goes slack and
-    /// the ball falls freely — an attachment, being a rod, would hold it up.
-    func isCableUnderTension(ballCenter: CGPoint, velocity: CGPoint, anchor: CGPoint) -> Bool {
-        let cosTheta = (ballCenter.y - anchor.y) / cableLength
-        let speedSquared = velocity.x * velocity.x + velocity.y * velocity.y
-        return speedSquared / cableLength + gravityAcceleration * cosTheta > 0
     }
 
     // MARK: - Wall
@@ -145,7 +160,7 @@ struct WreckingBallDemoViewModel {
     }
 
     /// Places a pedestal with a brick wall on the ground, right of the ball.
-    func wallLayout(in bounds: CGRect) -> WallLayout {
+    func wallLayout(in bounds: CGRect, ballRest: CGPoint) -> WallLayout {
         let wallX = bounds.width - wallRightInset
         // Rows shift by a sixth of a brick: enough to read as a bond, small
         // enough that every edge brick's center still sits on the brick below.
@@ -156,7 +171,7 @@ struct WreckingBallDemoViewModel {
         // overhang with their centers still supported, and a brick shoved
         // outward tips off instead of coming to rest on the pedestal.
         let platformEndX = wallX + rowWidth / 2 - stagger
-        let platformY = bounds.height - platformBottomInset
+        let platformY = ballRest.y + wreckingBallDiameter / 2 - platformRise
 
         var centers: [CGPoint] = []
         let rowPitch = brickSize.height + brickGap
